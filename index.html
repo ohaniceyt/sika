@@ -48,8 +48,19 @@
 
   .header {
     position: sticky; top:0; z-index:10;
-    padding: calc(14px + env(safe-area-inset-top)) 20px 8px;
+    padding: calc(14px + env(safe-area-inset-top)) 20px 10px;
+    /* liquid glass : verre dépoli + reflet spéculaire, filet n'apparaissant qu'au défilement (UINavigationBar) */
+    background: rgba(249,249,251,.78);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.35);
+    border-bottom: .5px solid transparent;
+    transition: border-color .3s ease;
   }
+  @media (prefers-color-scheme: dark) {
+    .header { background: rgba(16,16,18,.72); box-shadow: inset 0 1px 0 rgba(255,255,255,.06); }
+  }
+  .header.scrolled { border-bottom-color: var(--separator); }
   .header .large-title { font-size: 34px; font-weight: 800; letter-spacing: -.5px; }
   .header .sub { font-size: 15px; color: var(--secondary-label); margin-top: 2px; font-weight: 500; }
 
@@ -330,6 +341,29 @@
     transition: transform .15s;
   }
   .del-btn:active { transform: scale(.85); }
+
+  /* Swipe des catégories (modifier / supprimer) */
+  .swipe-wrap { position:relative; overflow:hidden; }
+  .swipe-wrap:first-child { border-radius:14px 14px 0 0; }
+  .swipe-wrap:last-child { border-radius:0 0 14px 14px; }
+  .swipe-front { position:relative; background:var(--card); transition:transform .25s cubic-bezier(.32,.72,.33,1); touch-action:pan-y; cursor:pointer; z-index:2; }
+  .swipe-front:active { background:var(--fill); }
+  .swipe-wrap + .swipe-wrap .swipe-front::before {
+    content:""; position:absolute; top:0; left:57px; right:0; height:.5px; background:var(--separator);
+  }
+  .swipe-actions {
+    position:absolute; top:0; bottom:0; width:76px; z-index:1;
+    display:flex; align-items:stretch; padding:6px 0;
+  }
+  .sw-btn {
+    flex:1; border:0; cursor:pointer; font-family:inherit;
+    font-size:11px; font-weight:700; color:#fff; line-height:1.2;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+  }
+  .sw-btn span { font-size:11px; }
+  .sw-btn.edit { background:var(--blue); border-radius:12px; margin-left:2px; }
+  .sw-btn.del  { background:var(--red);  border-radius:12px; margin-right:2px; }
+  .sw-btn:active { filter:brightness(.85); }
   .emoji-grid { display:grid; grid-template-columns: repeat(6, 1fr); gap:6px; margin-top:8px; }
   .emoji-cell {
     border:0; cursor:pointer; font-family:inherit; font-size:20px; padding:8px 0;
@@ -786,6 +820,25 @@
   <button class="btn-ghost" id="goal-withdraw" onclick="withdrawFromGoal()">Retirer de l'objectif</button>
 </div>
 
+<div class="sheet" id="edit-cat-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2>Modifier la catégorie</h2>
+  <div class="field">
+    <label>Nom</label>
+    <input id="cat-edit-name" aria-label="Nom de la catégorie" type="text" placeholder="Ex : Voyages">
+  </div>
+  <div class="field">
+    <label>Icône</label>
+    <div class="emoji-grid" id="emoji-grid-e"></div>
+  </div>
+  <div class="field">
+    <label>Couleur</label>
+    <div class="swatches" id="color-grid-e"></div>
+  </div>
+  <button class="btn-primary" onclick="saveEditCat()">Enregistrer</button>
+  <button class="btn-ghost" onclick="deleteFromEditCat()">Supprimer la catégorie</button>
+</div>
+
 <div class="sheet" id="edit-sheet" role="dialog" aria-modal="true">
   <div class="grabber"></div>
   <h2>Modifier la dépense</h2>
@@ -1207,7 +1260,8 @@ function clearSheetOverlay(){
   document.getElementById("overlay").classList.remove("show"); syncScrollLock();
 }
 function closeAllSheets(){
-  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet();
+  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet();
+  closeOpenSwipe();
   clearSheetOverlay();
 }
 
@@ -1229,16 +1283,64 @@ function renderHistFilter(){
 function renderCats(){
   const host = document.getElementById("cat-manage");
   host.innerHTML = "";
+  openSwipe = null;
   Object.entries(state.cats).forEach(([k,c])=>{
     const count = state.expenses.filter(e=>e.cat===k).length;
-    const row = document.createElement("div"); row.className = "setrow";
-    row.innerHTML = `<div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
+    // swipe iOS : à droite = Modifier, à gauche = Supprimer
+    const wrap = document.createElement("div"); wrap.className = "swipe-wrap";
+    wrap.innerHTML = `
+      <div class="swipe-actions" style="left:0"><button class="sw-btn edit" aria-label="Modifier la catégorie">✏️<span>Modifier</span></button></div>
+      <div class="swipe-actions" style="right:0"><button class="sw-btn del" aria-label="Supprimer la catégorie">🗑️<span>Supprimer</span></button></div>`;
+    const front = document.createElement("div"); front.className = "swipe-front setrow";
+    front.setAttribute("role","button"); front.tabIndex = 0;
+    front.setAttribute("aria-label", `Catégorie ${c.label}, ${count===1?"1 dépense":count+" dépenses"}, glisse à droite pour modifier, à gauche pour supprimer`);
+    front.innerHTML = `<div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
       <div class="n">${esc(c.label)}<span style="font-size:12px;color:var(--secondary-label);margin-left:7px">${count===1?"1 dépense":count+" dépenses"}</span></div>`;
-    const del = document.createElement("button"); del.className = "del-btn"; del.textContent = "✕";
-    del.setAttribute("aria-label", "Supprimer");
-    del.onclick = () => deleteCat(k);
-    row.appendChild(del);
-    host.appendChild(row);
+    front.onclick = () => { if (openSwipe){ closeOpenSwipe(); return; } openEditCat(k); };
+    front.onkeydown = e => { if (e.key==="Enter" || e.key===" "){ e.preventDefault(); openEditCat(k); } };
+    attachSwipe(wrap, front, ()=>openEditCat(k), ()=>deleteCat(k));
+    wrap.appendChild(front);
+    host.appendChild(wrap);
+  });
+}
+let openSwipe = null;
+function closeOpenSwipe(){
+  if (openSwipe){ openSwipe(); openSwipe = null; }
+}
+function attachSwipe(wrap, front, onEdit, onDelete){
+  const MAX = 76;
+  let x0 = null, y0 = null;
+  wrap.querySelector(".sw-btn.edit").onclick = e => { e.stopPropagation(); onEdit(); };
+  wrap.querySelector(".sw-btn.del").onclick  = e => { e.stopPropagation(); onDelete(); };
+  front.addEventListener("touchstart", e=>{
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+    front.style.transition = "none";
+  }, {passive:true});
+  front.addEventListener("touchmove", e=>{
+    if (x0===null) return;
+    const t = e.touches[0];
+    const dX = t.clientX - x0, dY = Math.abs(t.clientY - y0);
+    if (dY > Math.abs(dX) && dY > 10){ x0 = null; front.style.transition=""; return; }  // laisse défiler
+    const m = getComputedStyle(front).transform;
+    const cur = (m && m !== "none") ? (new DOMMatrixReadOnly(m)).m41 : 0;
+    let v = cur + dX;
+    x0 = t.clientX; y0 = t.clientY;
+    if (v > MAX) v = MAX + (v-MAX)*0.25;
+    if (v < -MAX) v = -MAX + (v+MAX)*0.25;
+    front.style.transform = `translateX(${v}px)`;
+  }, {passive:true});
+  front.addEventListener("touchend", ()=>{
+    front.style.transition = "";
+    x0 = null;
+    const v = parseFloat((front.style.transform.match(/-?\d+\.?\d*/) || [0])[0]);
+    const side = v > MAX*0.5 ? 1 : (v < -MAX*0.5 ? -1 : 0);
+    if (openSwipe) { openSwipe(); openSwipe = null; }
+    if (side){
+      front.style.transform = `translateX(${side*MAX}px)`;
+      openSwipe = () => { front.style.transform = ""; };
+    } else {
+      front.style.transform = "";
+    }
   });
 }
 
@@ -1258,6 +1360,7 @@ function deleteCat(k){
   if (!confirm(msg)) return;
   if (count && state.cats["other"] && k !== "other"){
     state.expenses.forEach(e=>{ if (e.cat===k) e.cat = "other"; });
+    state.recurring.forEach(r=>{ if (r.cat===k) r.cat = "other"; });
   }
   delete state.cats[k];
   if (state.budgets) delete state.budgets[k];
@@ -1324,7 +1427,48 @@ function saveNewCat(){
   toast(`✓ « ${name} » ajoutée`);
 }
 
-/* ============ Objectifs d'épargne ============ */
+/* ============ Modifier une catégorie (swipe) ============ */
+let editingCatKey = null, editEmoji = '📦', editColor = COLORS[0];
+function openEditCat(k){
+  const c = state.cats[k]; if(!c) return;
+  editingCatKey = k; editEmoji = c.emoji; editColor = c.color;
+  document.getElementById("cat-edit-name").value = c.label;
+  document.getElementById("emoji-grid-e").innerHTML =
+    EMOJIS.map(e=>`<button class="emoji-cell ${e===editEmoji?'on':''}" onclick="pickEditEmoji('${e}')">${e}</button>`).join("");
+  document.getElementById("color-grid-e").innerHTML =
+    COLORS.map(cl=>`<button class="swatch ${cl===editColor?'on':''}" style="background:${cl}" data-c="${cl}" onclick="pickEditColor('${cl}')"></button>`).join("");
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("edit-cat-sheet").classList.add("show"); syncScrollLock();
+  setTimeout(()=>document.getElementById("cat-edit-name").focus(), 460);
+}
+function pickEditEmoji(e){
+  editEmoji = e;
+  document.querySelectorAll("#emoji-grid-e .emoji-cell").forEach(b=>b.classList.toggle("on", b.textContent===e));
+}
+function pickEditColor(h){
+  editColor = h;
+  document.querySelectorAll("#color-grid-e .swatch").forEach(b=>b.classList.toggle("on", b.dataset.c===h));
+}
+function closeEditCatSheet(){
+  document.getElementById("edit-cat-sheet").classList.remove("show");
+  document.getElementById("overlay").classList.remove("show"); syncScrollLock();
+}
+function saveEditCat(){
+  const c = state.cats[editingCatKey]; if(!c) return;
+  const name = document.getElementById("cat-edit-name").value.trim();
+  if (!name){ toast("Donne un nom à la catégorie"); return; }
+  if (Object.entries(state.cats).some(([k2,c2])=>k2!==editingCatKey && c2.label.toLowerCase()===name.toLowerCase())){
+    toast("Cette catégorie existe déjà"); return;
+  }
+  c.label = name; c.emoji = editEmoji; c.color = editColor;
+  save(); closeEditCatSheet(); renderHistFilter(); render();
+  toast("✓ Catégorie modifiée");
+}
+function deleteFromEditCat(){
+  const k = editingCatKey;
+  closeEditCatSheet();
+  if (k) deleteCat(k);   // deleteCat gère son propre confirm + réaffectation
+}
 let contribGoalId = null;
 function renderGoals(){
   const host = document.getElementById("goals");
@@ -1790,6 +1934,13 @@ document.addEventListener("keydown", e=>{
 
 document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeAllSheets(); });
 
+// Filet du header liquide : visible seulement quand le contenu glisse dessous
+function updateHeaders(){
+  document.querySelectorAll(".header").forEach(h=>h.classList.toggle("scrolled", window.scrollY > 12));
+}
+window.addEventListener("scroll", updateHeaders, {passive:true});
+window.addEventListener("resize", updateHeaders, {passive:true});
+
 // Scroll lock : le fond ne défile pas pendant qu'une sheet est ouverte
 function syncScrollLock(){
   const open = document.querySelector(".sheet.show");
@@ -1811,7 +1962,9 @@ enableSwipeClose(document.getElementById("cat-sheet"), closeCatSheet);
 enableSwipeClose(document.getElementById("rec-sheet"), ()=>{ closeSheet(); closeRecSheet(); });
 enableSwipeClose(document.getElementById("goal-sheet"), ()=>{ closeSheet(); closeGoalSheets(); });
 enableSwipeClose(document.getElementById("goal-contrib-sheet"), ()=>{ closeSheet(); closeGoalSheets(); });
-enableSwipeClose(document.getElementById("edit-sheet"), ()=>{ closeEditSheet(); clearSheetOverlay(); });
+enableSwipeClose(document.getElementById("edit-sheet"), ()=>{ closeEditSheet(); clearSheetOverlay(); syncScrollLock(); });
+enableSwipeClose(document.getElementById("edit-cat-sheet"), closeEditCatSheet);
+document.getElementById("cat-edit-name").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); saveEditCat(); } });
 
 /* ============ Init ============ */
 load();
