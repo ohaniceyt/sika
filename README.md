@@ -1,4 +1,4 @@
-# Sika 💰 — app PWA de suivi de dépenses
+# Sika 💰 v1.0 — app PWA de suivi de dépenses
 
 **Sika** (l'argent, enakan) — suivi de budget personnel, design iOS (Human Interface Guidelines), **100% local** : aucune donnée ne quitte l'appareil, jamais.
 
