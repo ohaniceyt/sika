@@ -12,8 +12,8 @@ import { mkdirSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
-const icons = join(root, "depenses-tracker", "icons");
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const icons = join(root, "icons");
 const out = join(icons, "splash");
 mkdirSync(out, { recursive: true });
 

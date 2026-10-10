@@ -846,6 +846,7 @@
   <div class="grabber"></div>
   <h2>Photo de reçu</h2>
   <p class="hint" id="ocr-status" style="margin-top:2px;display:none"></p>
+  <p class="hint" id="ocr-net" style="display:none">photo et reconnaissance du texte : le 1ᵉʳ chargement (~5 Mo) demande le réseau</p>
   <div class="field" id="ocr-bar-wrap" style="display:none">
     <div style="height:4px;background:var(--fill);border-radius:2px;overflow:hidden">
       <div id="ocr-bar" style="width:0%;height:100%;background:#0a84ff;transition:width .3s"></div>
@@ -1283,7 +1284,7 @@ function renderRecurring(){
     const row = document.createElement("div"); row.className = "setrow";
     row.setAttribute("role","button"); row.tabIndex = 0;
     row.setAttribute("aria-label", tt("Modifier la récurrence {a}", {a: r.name}));
-    row.innerHTML = `<div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
+    row.innerHTML = `<div class="icon-badge" style="background:${c.color}22">${esc(c.emoji)}</div>
       <div class="n">${esc(r.name)}<div style="font-size:12px;color:var(--secondary-label)">${money(+r.amount)} · ${r.freq==="w" ? tt("chaque {a}", {a: I18N_WD()[+r.wd||0]}) : tt("le {a} de chaque mois", {a: r.day})}</div></div>`;
     row.onclick = ()=>openRecEdit(r);
     row.onkeydown = e => { if (e.key==="Enter" || e.key===" "){ e.preventDefault(); openRecEdit(r); } };
@@ -1389,12 +1390,12 @@ function openCsvSheet(rows){
   const total = rows.reduce((s,r)=>s+r.amount,0);
   document.getElementById("csv-title").textContent = tt("Import du relevé · {n} opérations", {n: rows.length});
   document.getElementById("csv-preview").innerHTML =
-    `<div class="empty" style="padding:4px 0 10px">${t("Total : ")}<b>${money(total)}</b><br><span style="font-size:12px">${t("Catégories devinées automatiquement — modifiables après en tapant une dépense.")}</span></div>
+    `<div class="empty" style="padding:4px 0 10px">${tt("Total : ", {})}<b>${money(total)}</b><br><span style="font-size:12px">${t("Catégories devinées automatiquement — modifiables après en tapant une dépense.")}</span></div>
      <div class="csv-wrap">` + rows.map(r=>{
        const c = catOf(r.cat);
        return `<div class="csv-row"><span class="csv-d">${r.date.slice(8)}/${r.date.slice(5,7)}</span>
          <span class="csv-l">${esc(r.label)}</span>
-         <span style="white-space:nowrap">${c.emoji}</span>
+         <span style="white-space:nowrap">${esc(c.emoji)}</span>
          <span class="csv-a">${money(r.amount)}</span></div>`;
      }).join("") + `</div>`;
   document.getElementById("overlay").classList.add("show"); syncScrollLock();
@@ -1618,6 +1619,13 @@ const I18N_EN = {
   "Profil mis à jour":"Profile updated",
   "Devise :":"Currency:",
   "💾 Sauvegarde exportée":"💾 Backup exported",
+  "💾 Sauvegarde partagée — enregistre-la dans Fichiers":"💾 Backup shared — save it to Files",
+  "📤 CSV exporté":"📤 CSV exported",
+  "Partage annulé":"Share cancelled",
+  "Pas encore de comparaison possible.":"No comparison possible yet.",
+  "Rechercher une dépense…":"Search for an expense…",
+  "Rechercher une dépense":"Search for an expense",
+  "Budget global désactivé — Sika suit juste tes dépenses":"Global budget off — Sika just tracks your spending",
   "⚠️ Sauvegarde impossible — exporte tes données (Réglages → Données)":"⚠️ Backup failed — export your data (Settings → Data)",
   "Sika : impossible d'enregistrer":"Sika: unable to save",
   "🛜 Connexion rétablie":"🛜 Back online",
@@ -1673,7 +1681,7 @@ const I18N_EN_T = {
   "+{a} épargnés":"+{a} saved",
   "{a} retirés":"{a} withdrawn",
   "🎯 Objectif « {a} » créé":"🎯 Goal « {a} » created",
-  "🎉 Objectif « {a} » atteint !":"🎉 Goal « {a } » reached!",
+  "🎉 Objectif « {a} » atteint !":"🎉 Goal « {a} » reached!",
   "Supprimer l'objectif « {a} » ?":"Delete goal « {a} »?",
   "({a} épargnés sont à remettre de côté de ton côté.)":"({a} saved — remember to set it aside yourself.)",
   "Supprimer la catégorie « {a} » ?":"Delete category « {a} »?",
@@ -2000,7 +2008,7 @@ function renderList(elId, items, compact){
       const r=document.createElement("div"); r.className="rowitem";
       r.setAttribute("role","button"); r.tabIndex=0;
       r.setAttribute("aria-label", tt("Dépense : {a}, {b}", {a: e.name, b: money(e.amount)}));
-      r.innerHTML=`<div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
+      r.innerHTML=`<div class="icon-badge" style="background:${c.color}22">${esc(c.emoji)}</div>
         <div class="txt"><div class="n">${esc(e.name)}</div><div class="d">${esc(c.label)} · ${dayName(e.date)}</div></div>
         <div class="amt">-${money(e.amount)}</div>`;
       r.onclick=()=>openEdit(e.id);
@@ -2015,7 +2023,7 @@ function renderList(elId, items, compact){
       day.sort((a,b)=>b.id.localeCompare(a.id)).forEach(e=>{
         const c=catOf(e.cat);
         html += `<div class="rowitem" data-id="${e.id}" role="button" tabindex="0" aria-label="${esc(tt("Dépense : {a}, {b}", {a: e.name, b: money(e.amount)}))}">
-          <div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
+          <div class="icon-badge" style="background:${c.color}22">${esc(c.emoji)}</div>
           <div class="txt"><div class="n">${esc(e.name)}</div><div class="d">${esc(c.label)}</div></div>
           <div class="amt">-${money(e.amount)}</div></div>`;
       });
@@ -2186,7 +2194,7 @@ function renderHistFilter(){
   seg.dataset.c = cur;
   seg.innerHTML = `<button class="${cur==='all'?'on':''}" data-c="all">Tout</button>` +
     Object.entries(state.cats).map(([k,c]) =>
-      `<button class="${k===cur?'on':''}" data-c="${k}">${c.emoji}</button>`).join("");
+      `<button class="${k===cur?'on':''}" data-c="${k}">${esc(c.emoji)}</button>`).join("");
 }
 
 function renderCats(){
@@ -2203,7 +2211,7 @@ function renderCats(){
     const front = document.createElement("div"); front.className = "swipe-front setrow";
     front.setAttribute("role","button"); front.tabIndex = 0;
     front.setAttribute("aria-label", tt(`Catégorie {a}, {b}, glisse à droite pour modifier, à gauche pour supprimer`, {a: c.label, b: count===1 ? t("1 dépense") : tt("{n} dépense(s)", {n: count})}));
-    front.innerHTML = `<div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
+    front.innerHTML = `<div class="icon-badge" style="background:${c.color}22">${esc(c.emoji)}</div>
       <div class="n">${esc(c.label)}<span style="font-size:12px;color:var(--secondary-label);margin-left:7px">${count===1 ? t("1 dépense") : tt("{n} dépense(s)", {n: count})}</span></div>`;
     front.onclick = () => { if (openSwipe){ closeOpenSwipe(); return; } openEditCat(k); };
     front.onkeydown = e => { if (e.key==="Enter" || e.key===" "){ e.preventDefault(); openEditCat(k); } };
@@ -2341,7 +2349,7 @@ function renderBudgets(){
   host.innerHTML = "";
   Object.entries(state.cats).forEach(([k,c])=>{
     const row = document.createElement("div"); row.className = "setrow";
-    row.innerHTML = `<div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
+    row.innerHTML = `<div class="icon-badge" style="background:${c.color}22">${esc(c.emoji)}</div>
       <div class="n">${esc(c.label)}</div>
       <input class="budgets-input" type="text" inputmode="decimal" placeholder="—"
              aria-label="${esc(tt("Enveloppe mensuelle : {a}", {a: c.label}))}" data-k="${k}" value="${(+state.budgets[k]||"")}">
@@ -2570,7 +2578,6 @@ function deleteRecFromEdit(){
   save(); closeRecSheet(); clearSheetOverlay(); renderRecurring(); render();
   toast("Récurrence arrêtée");
 }
-function closeRecSheet(){ document.getElementById("rec-sheet").classList.remove("show"); }
 function setRecFreq(f){
   document.querySelectorAll("#rec-freq button").forEach(b=>b.classList.toggle("on", b.dataset.f===f));
   document.getElementById("rec-day-field").style.display = f==="m" ? "" : "none";
@@ -2713,22 +2720,61 @@ async function exportBackup(){
   toast("💾 Sauvegarde exportée");
 }
 /* ====== Restauration : aperçu + fusion dédoublonnée ou remplacement ====== */
+/* --- Validation stricte des champs importés (anti-injection) ---
+   Un fichier de sauvegarde vient de l'extérieur (Mail/WhatsApp) : tout ce qui
+   finit interpolé dans du HTML (ids, clés de catégorie, emoji, couleurs,
+   valeurs de budgets, dates) est reconstruit ici ; un champ non conforme est
+   remplacé, jamais accepté tel quel. */
+const SAFE_UUID    = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+const SAFE_CAT_KEY = /^[a-z][a-z0-9_-]{0,31}$/i;
+const SAFE_COLOR   = /^#[0-9a-f]{6}$/i;
+const SAFE_DATE    = /^\d{4}-\d{2}-\d{2}$/;
+const safeId = id => (typeof id === "string" && SAFE_UUID.test(id)) ? id : crypto.randomUUID();
+function safeEmoji(e){
+  // emoji ou court symbole : aucun caractère HTML/contrôle ne doit survivre
+  const s = String(e ?? "").replace(/[<>&"'`\\\/{}]/g, "").replace(/\p{C}/gu, "").trim();
+  return s.slice(0, 8) || "📦";
+}
+const safeColor = c => (typeof c === "string" && SAFE_COLOR.test(c)) ? c : "#8e8e93";
 function buildBackup(s){
   if (!s || !Array.isArray(s.expenses)) throw new Error("format");
-  const catsSrc = s.cats && !Array.isArray(s.cats) ? s.cats : {};
-  const knownCat = k => Object.prototype.hasOwnProperty.call(catsSrc, k) ? k : null;
+  // Clés de catégories : les clés non conformes sont réinventées (impXXXXXXXX)
+  // et TOUTES les références (dépenses, budgets, récurrences) sont re-mappées.
+  const keyMap = {};
+  const mapKey = k => {
+    if (!keyMap[k]) keyMap[k] = SAFE_CAT_KEY.test(k) ? k : "imp" + crypto.randomUUID().slice(0, 8);
+    return keyMap[k];
+  };
+  const catsOut = {};
+  const catsSrc = (s.cats && typeof s.cats === "object" && !Array.isArray(s.cats)) ? s.cats : null;
+  Object.entries(catsSrc || {}).forEach(([k, c])=>{
+    if (!c || typeof c !== "object") return;
+    const label = String(c.label ?? "").slice(0, 40);
+    catsOut[mapKey(k)] = { label: label || "…", emoji: safeEmoji(c.emoji), color: safeColor(c.color) };
+  });
+  if (!Object.keys(catsOut).length){
+    Object.entries(JSON.parse(JSON.stringify(CATS))).forEach(([k, c])=>{ catsOut[k] = c; });
+  }
+  const knownCat = k => { const kk = keyMap[k] ?? k; return catsOut[kk] !== undefined ? kk : null; };
+  const budgetsOut = {};
+  if (s.budgets && typeof s.budgets === "object" && !Array.isArray(s.budgets)){
+    Object.entries(s.budgets).forEach(([k, v])=>{
+      const nv = +v, kk = knownCat(k);
+      if (kk && Number.isFinite(nv) && nv > 0) budgetsOut[kk] = nv;
+    });
+  }
   return {
     v: SCHEMA_VERSION,
     rev: +s.rev || 0,   // ⚠️ conservé : sans lui, la copie IndexedDB de l'appareil (rev plus haute) écraserait le fichier restauré au prochain boot
     budget: +s.budget || 0,
     currency: s.currency || "€",
     onboarded: true,
-    cats: (typeof s.cats === "object" && s.cats && Object.keys(s.cats).length) ? s.cats : JSON.parse(JSON.stringify(CATS)),
-    budgets: (s.budgets && typeof s.budgets === "object") ? s.budgets : {},
-    recurring: Array.isArray(s.recurring) ? s.recurring.filter(r=>r && r.cat && r.amount>0).map(r=>({ name:String(r.name).slice(0,80), cat:r.cat, amount:+r.amount, freq:(r.freq||"m"), wd:+r.wd||0, day:Math.min(Math.max(+r.day||1,1),28), lastAdded:r.lastAdded||"" })) : [],
-    goals: Array.isArray(s.goals) ? s.goals.filter(g=>g && g.target>0).map(g=>({ id:g.id||crypto.randomUUID(), name:String(g.name||"Objectif").slice(0,60), target:+g.target, saved:Math.max(0,+g.saved||0)})) : [],
+    cats: catsOut,
+    budgets: budgetsOut,
+    recurring: Array.isArray(s.recurring) ? s.recurring.filter(r=>r && r.amount>0).map(r=>({ name:String(r.name).slice(0,80), cat: knownCat(r.cat) || "other", amount:+r.amount, freq:(r.freq||"m"), wd:+r.wd||0, day:Math.min(Math.max(+r.day||1,1),28), lastAdded: SAFE_DATE.test(r.lastAdded||"") ? r.lastAdded : "" })) : [],
+    goals: Array.isArray(s.goals) ? s.goals.filter(g=>g && g.target>0).map(g=>({ id:safeId(g.id), name:String(g.name||"Objectif").slice(0,60), target:+g.target, saved:Math.max(0,+g.saved||0)})) : [],
     user: { name: String((s.user && s.user.name) || "").slice(0,20) },
-    expenses: s.expenses.filter(e=>e && e.cat && e.amount>0 && /^\d{4}-\d{2}-\d{2}$/.test(e.date)).map(e=>({ id:e.id||crypto.randomUUID(), name:String(e.name||"").slice(0,60), cat: knownCat(e.cat) || "other", amount:+e.amount, date:e.date}))
+    expenses: s.expenses.filter(e=>e && e.amount>0 && SAFE_DATE.test(e.date)).map(e=>({ id:safeId(e.id), name:String(e.name||"").slice(0,60), cat: knownCat(e.cat) || "other", amount:+e.amount, date:e.date}))
   };
 }
 let backupPending = null;
@@ -2848,7 +2894,10 @@ function applyBackupReplace(){
   const bk = backupPending; if (!bk) return;
   if (!confirm(tt("Remplacer TOUTES les données de cet appareil par le fichier ({n} dépense(s)) ?", {n: bk.expenses.length}))) return;
   const ownRev = +state.rev || 0;       // rev locale (au moins celle de la copie IDB, sinon l'IDB écraserait le remplacement au boot suivant)
+  // Préférences locales conservées : le fichier ne les référence pas
+  const keep = { lang: state.lang, legendMode: state.legendMode, eveningSeen: state.eveningSeen };
   state = bk;
+  Object.assign(state, keep);
   state.rev = Math.max(ownRev, +bk.rev || 0);
   state.lastBackupAt = ymd(new Date());
   closeBackupSheet();
@@ -3427,6 +3476,7 @@ async function ocrRun(file){
   document.getElementById("ocr-fields").style.display = "none";
   document.getElementById("ocr-go").style.display = "none";
   ocrStatus(t("Analyse du reçu en cours…"));
+  document.getElementById("ocr-net").style.display = window.__ocrLibP ? "none" : "block";   // 1ʳᵉ utilisation : télécharger le moteur demande le réseau
   document.getElementById("overlay").classList.add("show"); syncScrollLock();
   document.getElementById("ocr-sheet").classList.add("show"); syncScrollLock();
   try {
@@ -3435,6 +3485,7 @@ async function ocrRun(file){
     document.getElementById("ocr-preview-wrap").style.display = "block";
     ocrStatus(t("Chargement du moteur OCR…"));
     const w = await ocrWorker();
+    document.getElementById("ocr-net").style.display = "none";
     const { data } = await w.recognize(blob);
     const text = String((data && data.text) || "");
     const ex = ocrExtract(text);
@@ -3458,6 +3509,7 @@ async function ocrRun(file){
 function closeOcrSheet(){
   document.getElementById("ocr-sheet").classList.remove("show");
   clearSheetOverlay();
+  document.getElementById("ocr-net").style.display = "none";
   ocrStatus("");
 }
 function saveOcrExpense(){
