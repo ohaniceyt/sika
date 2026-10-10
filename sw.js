@@ -1,5 +1,5 @@
 /* Sika — service worker (network-first pour l'app shell, offline-first pour le reste) */
-const CACHE = "sika-v7";
+const CACHE = "sika-v8";
 const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon.svg"];
 
 self.addEventListener("install", e => {
