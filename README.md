@@ -13,7 +13,7 @@
 - **Modifier/supprimer** : tap sur une dépense → fiche complète ; sur une catégorie, glisse à droite = modifier, à gauche = supprimer (confirmation)
 - **Récurrences** mensuelles ou **hebdomadaires**, ajoutées automatiquement — moteur sans doublon, même en ouvrant l'app une fois par mois
 - **Objectifs d'épargne** avec progression et suppression
-- **Stats** : donut % ⇄ montant, comparatif vs mois précédent, tendance 6 mois, série de saisie, objectifs atteints
+- **Stats** : périodes mois / semaine / année (sélecteur), donut % ⇄ montant, comparatif vs mois ou semaine précédente, tendance 6 mois, série de saisie, objectifs atteints
 - **Historique** : groupé par jour, recherche, filtres, pagination (200 par 200)
 - **Données** : export CSV, sauvegarde/restauration JSON complète, **import de relevé bancaire CSV** avec détection du séparateur/format de date/`1 234,56`⇄`1,234.56` et **catégorisation automatique**, rappel de sauvegarde
 - **Hors ligne** : service worker, tout marche sans réseau

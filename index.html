@@ -548,6 +548,7 @@
   </div>
   <div class="segmented" id="stat-seg">
     <button class="on" data-p="month">Mois</button>
+    <button data-p="w">Semaine</button>
     <button data-p="year">Année</button>
   </div>
   <div class="stat-grid" id="stat-grid"></div>
@@ -565,7 +566,7 @@
     </div>
   </div>
   <div class="card" id="compare-card">
-    <div class="list-header" style="padding:0 0 0"><span class="t" style="font-size:17px">vs mois précédent</span></div>
+    <div class="list-header" style="padding:0 0 0"><span class="t" style="font-size:17px" id="compare-title">vs mois précédent</span></div>
     <div id="compare-host"></div>
   </div>
   <div class="card">
@@ -687,7 +688,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.21 bêta</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.22 alpha</div></div>
   </div>
 </div>
 
@@ -1395,21 +1396,35 @@ function renderList(elId, items, compact){
 }
 
 /* ============ Stats / Historique ============ */
+function weekBounds(offset){
+  const t = new Date();
+  const monday = new Date(t.getFullYear(), t.getMonth(), t.getDate() - (t.getDay()+6)%7);
+  monday.setDate(monday.getDate() + offset*7);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
+  return [ymd(monday), ymd(sunday)];
+}
 function renderStats(period){
   const now = new Date();
   let items;
   if (period==="month"){ items = state.expenses.filter(e=>e.date.startsWith(todayISO().slice(0,7))); }
+  else if (period==="w"){
+    const [s, e2] = weekBounds(0);
+    items = state.expenses.filter(e=>e.date>=s && e.date<=e2);
+  }
   else {
     const y = now.getFullYear();
     const start = new Date(y,0,1), end = new Date(y,11,31,23,59);
     items = state.expenses.filter(e=>{ const d=new Date(e.date+"T12:00:00"); return d>=start && d<=end; });
   }
   const total = items.reduce((s,e)=>s+e.amount,0);
-  const days = period==="month" ? new Date().getDate() : Math.ceil((now-new Date(now.getFullYear(),0,1))/DAY);
+  const lbl = period==="month" ? "du mois" : period==="w" ? "de la semaine" : "de l'année";
+  const days = period==="month" ? new Date().getDate()
+    : period==="w" ? Math.min(((now.getDay()+6)%7)+1, 7)
+    : Math.ceil((now-new Date(now.getFullYear(),0,1))/DAY);
   const avg = total/Math.max(days,1);
   const maxT = Math.max(...items.map(e=>e.amount),0);
   document.getElementById("stat-grid").innerHTML = `
-    <div class="stat"><div class="sv">${money(total)}</div><div class="sl">Total ${period==="month"?"du mois":"de l'année"}</div></div>
+    <div class="stat"><div class="sv">${money(total)}</div><div class="sl">Total ${lbl}</div></div>
     <div class="stat"><div class="sv">${money(avg)}</div><div class="sl">Moyenne / jour</div></div>
     <div class="stat"><div class="sv">${items.length}</div><div class="sl">Transactions</div></div>
     <div class="stat"><div class="sv">${money(maxT)}</div><div class="sl">Plus grosse dépense</div></div>
@@ -1883,14 +1898,20 @@ function updateChipSel(){
 function renderCompare(){
   const host = document.getElementById("compare-host");
   const period = document.getElementById("stat-seg").dataset.p || "month";
-  document.getElementById("compare-card").style.display = period==="month" ? "block" : "none";
-  if (period!=="month") return;
+  document.getElementById("compare-card").style.display = period==="year" ? "none" : "block";
+  document.getElementById("compare-title").textContent = period==="w" ? "vs semaine précédente" : "vs mois précédent";
   const now = new Date();
-  const pb = new Date(now.getFullYear(), now.getMonth()-1, 1);
-  const pKey = ymd(pb).slice(0,7);
-  const cur = monthSpendByCat();
-  const prev = {};
-  state.expenses.filter(e=>e.date.startsWith(pKey)).forEach(e=>prev[e.cat]=(prev[e.cat]||0)+e.amount);
+  let cur = {}, prev = {};
+  if (period==="w"){
+    const [cs, ce] = weekBounds(0), [ps, pe] = weekBounds(-1);
+    state.expenses.filter(e=>e.date>=cs && e.date<=ce).forEach(e=>cur[e.cat]=(cur[e.cat]||0)+e.amount);
+    state.expenses.filter(e=>e.date>=ps && e.date<=pe).forEach(e=>prev[e.cat]=(prev[e.cat]||0)+e.amount);
+  } else {
+    const pb = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    const pKey = ymd(pb).slice(0,7);
+    cur = monthSpendByCat();
+    state.expenses.filter(e=>e.date.startsWith(pKey)).forEach(e=>prev[e.cat]=(prev[e.cat]||0)+e.amount);
+  }
   const keys = [...new Set([...Object.keys(cur), ...Object.keys(prev)])];
   if (!keys.length || (!Object.keys(cur).length && !Object.keys(prev).length)){
     host.innerHTML = '<div class="empty" style="padding:18px 0">Pas encore de comparaison possible.</div>';
@@ -2165,7 +2186,7 @@ document.getElementById("stat-seg").addEventListener("click", e=>{
   const b=e.target.closest("button"); if(!b) return;
   document.querySelectorAll("#stat-seg button").forEach(x=>x.classList.remove("on"));
   b.classList.add("on"); document.getElementById("stat-seg").dataset.p=b.dataset.p;
-  renderStats(b.dataset.p);
+  renderStats(b.dataset.p); renderCompare();
 });
 document.getElementById("hist-filter").addEventListener("click", e=>{
   const b=e.target.closest("button"); if(!b) return;
