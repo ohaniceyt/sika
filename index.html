@@ -719,7 +719,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.24 bêta</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.25 alpha</div></div>
   </div>
 </div>
 
@@ -1014,6 +1014,14 @@
   <button class="btn-ghost" onclick="applyBackupReplace()" style="color:var(--red)">Remplacer tout</button>
   <button class="btn-ghost" onclick="closeBackupSheet()" style="color:var(--secondary-label)">Annuler</button>
   <p class="hint">Fusionner : ajoute les dépenses absentes de cet appareil (id + libellé + montant + date identiques = ignorées) et complète catégories et objectifs. Remplacer : efface tout ici et restaure tel quel.</p>
+</div>
+
+<div class="sheet" id="evening-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2>🌙 Vue du soir</h2>
+  <div id="evening-content" style="margin:8px 0 4px"></div>
+  <button class="btn-primary" onclick="closeEveningSheet(); openSheet()">＋ Ajouter une dépense</button>
+  <button class="btn-ghost" onclick="eveningDismiss()" style="color:var(--secondary-label)">OK</button>
 </div>
 
 <div class="sheet" id="device-sheet" role="dialog" aria-modal="true">
@@ -1526,6 +1534,10 @@ const I18N_EN = {
   "Catégories devinées automatiquement — modifiables après en tapant une dépense.":"Categories guessed automatically — editable afterwards by tapping an expense.",
   "Rien de nouveau à importer":"Nothing new to import",
   "Passer sur un autre appareil":"Move to another device",
+  "🌙 Vue du soir":"🌙 Evening view",
+  "＋ Ajouter une dépense":"＋ Add an expense",
+  "Rien saisi aujourd'hui — tout va bien.":"Nothing logged today — all good.",
+  "{a} de trop sur le mois":"{a} over budget this month",
   "Sika ne transmet rien du tout : tu passes par un fichier. La ligne rouge du 100% local reste intacte.":"Sika sends nothing at all: you go through a file. The 100% local red line stays intact.",
   "Ici : Réglages → Sauvegarde complète (JSON)":"Here: Settings → Full backup (JSON)",
   "Envoie le fichier par Mail, AirDrop ou WhatsApp":"Send the file by Mail, AirDrop or WhatsApp",
@@ -1536,10 +1548,6 @@ const I18N_EN = {
   "guide":"guide",
   "OK":"OK",
   "Aucun doublon à la fusion":"No duplicates on merge",
-  "Ici : Réglages → Sauvegarde complète (JSON)":"Here: Settings → Full backup (JSON)",
-  "Envoie le fichier par Mail, AirDrop ou WhatsApp":"Send the file by Mail, AirDrop or WhatsApp",
-  "Sur le nouvel appareil : Restaurer une sauvegarde → choisis fusionner":"On the new device: Restore a backup → choose merge",
-  "Sika ne transmet rien du tout : tu passes par un fichier. La ligne rouge du 100% local reste intacte.":"Sika sends nothing at all: you go through a file. The 100% local red line stays intact.",
   "objectif(s)":"goal(s)",
   "récurrence(s)":"recurring expense(s)",
   "Aucune opération reconnaissable dans ce fichier":"No recognizable transactions in this file",
@@ -1597,6 +1605,7 @@ const I18N_EN_T = {
   "Dépense : {a}, {b}":"Expense: {a}, {b}",
   "Enveloppe mensuelle : {a}":"Monthly envelope: {a}",
   "{a} de trop":"{a} over budget",
+  "Aujourd'hui : {n} dépense(s) · ":"Today: {n} expense(s) · ",
   "{a} restants":"{a} left",
   "Dépensé ce mois : {a} · Budget {b}":"Spent this month: {a} · Budget {b}",
   "{n} transaction(s) · {t}":"{n} transaction(s) · {t}",
@@ -2104,7 +2113,7 @@ function clearSheetOverlay(){
   document.getElementById("overlay").classList.remove("show"); syncScrollLock();
 }
 function closeAllSheets(){
-  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet(); closeLangSheet(); closeBackupSheet(); closeDeviceSheet();
+  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet(); closeLangSheet(); closeBackupSheet(); closeDeviceSheet(); closeEveningSheet();
   closeOpenSwipe();
   clearSheetOverlay();
 }
@@ -2699,6 +2708,48 @@ function openBackupSheet(bk){
   document.getElementById("overlay").classList.add("show"); syncScrollLock();
   document.getElementById("backup-sheet").classList.add("show"); syncScrollLock();
 }
+/* ====== Vue du soir : résumé du jour + rappels (alternative 100% locale aux push) ====== */
+function showEveningView(){
+  if (!state.onboarded) return;
+  const h = new Date().getHours();
+  if (h < 18 && h >= 5) return;
+  if (state.eveningSeen === todayISO()) return;
+  renderEveningView();
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("evening-sheet").classList.add("show"); syncScrollLock();
+}
+function eveningDismiss(){
+  state.eveningSeen = todayISO();   // une fois par soir
+  save(); closeEveningSheet();
+}
+function closeEveningSheet(){
+  document.getElementById("evening-sheet").classList.remove("show");
+  clearSheetOverlay();
+}
+function renderEveningView(){
+  const host = document.getElementById("evening-content");
+  const today = todayISO();
+  const todays = state.expenses.filter(e=>e.date===today).slice().sort((a,b)=>b.amount-a.amount);
+  const totalToday = todays.reduce((s,e)=>s+e.amount,0);
+  const month = today.slice(0,7);
+  const bud = catBudgetTotal() || state.budget;
+  const spent = state.expenses.filter(e=>e.date.startsWith(month)).reduce((s,e)=>s+e.amount,0);
+  let lines = "";
+  if (!todays.length){
+    lines += `<div class="setrow"><div class="n" style="color:var(--secondary-label);font-size:14px">${t("Rien saisi aujourd'hui — tout va bien.")}</div></div>`;
+  } else {
+    lines += `<div class="setrow"><div class="n">${tt("Aujourd'hui : {n} dépense(s) · ", {n: todays.length})}<b>${money(totalToday)}</b></div></div>`;
+    if (todays[0]) lines += `<div class="setrow"><div class="n" style="font-size:13.5px">${esc(catOf(todays[0].cat).emoji)} ${t("Plus grosse dépense")} : <b>${money(todays[0].amount)}</b> — ${esc(todays[0].name)}</div></div>`;
+  }
+  if (bud > 0){
+    const rest = bud - spent;
+    lines += rest >= 0
+      ? `<div class="setrow"><div class="n">${t("Solde mensuel restant")} : <b>${money(rest)}</b></div></div>`
+      : `<div class="setrow"><div class="n" style="color:var(--red)">⚠️ ${tt("{a} de trop sur le mois", {a: money(-rest)})}</div></div>`;
+  }
+  if (state.expenses.length && !(state.lastBackupAt)) lines += `<div class="setrow"><div class="n" style="font-size:13.5px">${t("Aucune sauvegarde depuis la création — ton historique mérite un fichier")}</div></div>`;
+  host.innerHTML = lines;
+}
 function openDeviceSheet(){
   document.getElementById("overlay").classList.add("show"); syncScrollLock();
   document.getElementById("device-sheet").classList.add("show"); syncScrollLock();
@@ -3079,6 +3130,7 @@ enableSwipeClose(document.getElementById("goal-contrib-sheet"), ()=>{ closeSheet
 enableSwipeClose(document.getElementById("edit-sheet"), ()=>{ closeEditSheet(); clearSheetOverlay(); syncScrollLock(); });
 enableSwipeClose(document.getElementById("backup-sheet"), closeBackupSheet);
 enableSwipeClose(document.getElementById("device-sheet"), closeDeviceSheet);
+enableSwipeClose(document.getElementById("evening-sheet"), closeEveningSheet);
 enableSwipeClose(document.getElementById("edit-cat-sheet"), closeEditCatSheet);
 document.getElementById("cat-edit-name").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); saveEditCat(); } });
 
@@ -3156,6 +3208,7 @@ applyI18n();
 __i18nObs.observe(document.body, { childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:["placeholder","aria-label","title"] });
 render();
 if (!state.onboarded) showOnboarding();
+else setTimeout(showEveningView, 700);   // le soir venu : résumé du jour (une fois par soir)
 })().catch(err => { console.error("Sika : échec de l'init", err); toast("⚠️ Erreur au démarrage"); });
 /* (le bloc PWA, ci-dessous, n'a pas besoin de state : il reste hors du IIFE async) */
 
