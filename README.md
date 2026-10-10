@@ -19,7 +19,7 @@
 - **Hors ligne** : service worker, tout marche sans réseau
 
 ## Technique
-HTML/CSS/JS vanilla dans un seul `index.html` (~100 Ko), **zéro dépendance**, zéro serveur. Schéma de données versionné (v3), stockage `localStorage` (blindé contre la corruption), backup manuel encadré par un rappel automatique + bandeau mensuel, focus-trap et `role="button"` sur les listes (clavier).
+HTML/CSS/JS vanilla dans un seul `index.html` (~100 Ko), **zéro dépendance**, zéro serveur. Schéma de données versionné (v3), stockage « double copie » : `localStorage` (arbitré par un compteur `rev` monotone) + **IndexedDB** durable — supporte bien plus de 20 000 dépenses même quand le quota localStorage (~5 Mo chez Safari) sature, avec reprise auto de la copie la plus récente. Backup manuel encadré par un rappel automatique + bandeau mensuel, focus-trap et `role="button"` sur les listes (clavier).
 
 Icônes : source vectorielle unique `icons/icon.svg` (~0,9 Ko) → PNG compressés palette (~10–12 Ko) + **écrans de démarrage iOS** light/dark (une taille exacte par appareil, `apple-touch-startup-image`). Régénérables en 1 commande : `node scripts/gen-ios-assets.mjs` (script dev, nécessite `npm i sharp`, pas déployé).
 

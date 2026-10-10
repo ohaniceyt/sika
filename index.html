@@ -714,7 +714,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.23 alpha</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.23 bêta</div></div>
   </div>
 </div>
 
@@ -1018,8 +1018,7 @@ const DAY = 864e5;
 let state = null;
 
 const SCHEMA_VERSION = 3;
-function load() {
-  const raw = localStorage.getItem("depenses-state");
+function stateInit(raw){
   try {
     state = raw ? JSON.parse(raw) : null;
   } catch (err) {
@@ -1039,6 +1038,33 @@ function load() {
   // Migration : les profils existants (données présentes) sautent l'onboarding
   if (state.onboarded === undefined) { state.onboarded = !!(raw && state.expenses.length); }
   if (raw && state.expenses.length) { processRecurring(); }   // pas de seed ici : l'onboarding décide
+}
+
+/* load() : choisit la copie la plus récente (localStorage ⇄ IndexedDB) puis initialise */
+async function load(){
+  let raw = localStorage.getItem("depenses-state");
+  let lsObj = null;
+  try { lsObj = raw ? JSON.parse(raw) : null; } catch(_){ lsObj = null; }
+  let idbWrap = null;
+  try {
+    if (window.indexedDB){
+      idb = await idbOpen();
+      if (idb){
+        const w = await idbGet();
+        if (w && w.app === "sika" && w.state && typeof w.state === "object") idbWrap = w;
+      }
+    }
+  } catch(err){ console.warn("Sika : IndexedDB indisponible — localStorage seul", err); idb = null; }
+  const lsRev = (lsObj && +lsObj.rev) || 0;
+  const idbRev = (idbWrap && +idbWrap.rev) || 0;
+  if (idbWrap && idbRev > lsRev){
+    // la copie durable est plus à jour (ex : localStorage plein) → on la reprend
+    console.info(`Sika : état repris d'IndexedDB (rev ${idbRev} > localStorage ${lsRev})`);
+    stateInit(JSON.stringify(idbWrap.state));
+  } else {
+    stateInit(raw);
+  }
+  if (idbWrap && idbRev > 0 && (+state.rev||0) > idbRev){ idbPersist(); }  // sync immédiat de la copie durable
   save();
 }
 
@@ -1065,14 +1091,61 @@ function autoSplitBudget(){
   });
 }
 function save(){
+  state.rev = (+state.rev || 0) + 1;   // compteur monotone : arbitre entre les 2 copies
+  let lsOk = false;
   try {
     if (state.user) { state.lastChangeAt = ymd(new Date()); }   // pour le rappel de sauvegarde
     localStorage.setItem("depenses-state", JSON.stringify(state));
+    lsOk = true;
   } catch (err) {
-    // Quota dépassé (Safari iOS ~5 Mo) ou mode privé : on n'écrase pas l'app
-    console.warn("Sika : impossible d'enregistrer", err);
-    toast("⚠️ Sauvegarde impossible — exporte tes données (Réglages → Données)");
+    // Quota dépassé (Safari iOS ~5 Mo) ou mode privé : la copie IndexedDB prend le relais
+    console.warn("Sika : localStorage plein ou inaccessible", err);
+    if (!idb) toast("⚠️ Sauvegarde impossible — exporte tes données (Réglages → Données)");
   }
+  if (!lsOk) idbPersist();               // immédiat si localStorage a échoué
+  else { clearTimeout(idbTimer); idbTimer = setTimeout(idbPersist, 600); }
+}
+/* ============ Stockage IndexedDB (durable au-delà du quota localStorage) ============ */
+let idb = null, idbTimer = null;
+function idbOpen(){
+  return new Promise(res=>{
+    try {
+      const rq = indexedDB.open("sika", 1);
+      rq.onupgradeneeded = ()=>{ const db = rq.result; if (!db.objectStoreNames.contains("state")) db.createObjectStore("state"); };
+      rq.onsuccess = ()=>res(rq.result);
+      rq.onerror = ()=>res(null);
+      rq.onblocked = ()=>res(null);
+    } catch(_){ res(null); }
+  });
+}
+function idbGet(){
+  return new Promise(res=>{
+    try {
+      const tx = idb.transaction("state","readonly");
+      const rq = tx.objectStore("state").get("main");
+      rq.onsuccess = ()=>res(rq.result || null);
+      rq.onerror = ()=>res(null);
+      tx.onabort = ()=>res(null);
+    } catch(_){ res(null); }
+  });
+}
+async function idbPersist(){
+  if (!idb || !state) return;
+  try {
+    const wrap = { app:"sika", schema:SCHEMA_VERSION, savedAt:new Date().toISOString(), rev:+state.rev||0, state };
+    const tx = idb.transaction("state","readwrite");
+    tx.objectStore("state").put(wrap, "main");
+    tx.onerror = e=>console.warn("Sika : écriture IndexedDB impossible", e && e.target && e.target.error);
+    tx.onabort = ()=>idbClose();
+  } catch(err){ console.warn("Sika : IndexedDB inaccessible", err); }
+}
+let idbFailures = 0;
+function idbClose(){
+  if (++idbFailures > 3){ idb = null; console.warn("Sika : IndexedDB abandonnée (3 blocages) — localStorage seul"); }
+}
+async function idbErase(){
+  if (!idb) return;
+  try { const tx = idb.transaction("state","readwrite"); tx.objectStore("state").delete("main"); } catch(_){}
 }
 
 
@@ -2700,7 +2773,7 @@ function toast(msg){
 }
 function resetAll(){
   if (confirm("Supprimer TOUTES les dépenses ? Cette action est irréversible.")){
-    state.expenses=[]; save(); render(); toast("Données effacées");
+    state.expenses=[]; idbErase(); save(); render(); toast("Données effacées");
   }
 }
 
@@ -2835,7 +2908,8 @@ enableSwipeClose(document.getElementById("edit-cat-sheet"), closeEditCatSheet);
 document.getElementById("cat-edit-name").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); saveEditCat(); } });
 
 /* ============ Init ============ */
-load();
+(async () => {
+await load();   // IndexedDB ⇄ localStorage (async)
 document.getElementById("today-date").textContent = new Date().toLocaleDateString(I18N_LOCALE(),{weekday:'long',day:'numeric',month:'long'});
 document.getElementById("budget-input").value = state.budget;
 document.getElementById("currency-select").value = state.currency;
@@ -2908,6 +2982,8 @@ applyI18n();
 __i18nObs.observe(document.body, { childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:["placeholder","aria-label","title"] });
 render();
 if (!state.onboarded) showOnboarding();
+})();
+/* (le bloc PWA, ci-dessous, n'a pas besoin de state : il reste hors du IIFE async) */
 
 /* ============ PWA ============ */
 if ("serviceWorker" in navigator && location.protocol === "https:") {
