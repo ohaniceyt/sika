@@ -261,6 +261,7 @@
   .setrow + .setrow::before { content:""; position:absolute; top:0; left:57px; right:0; height:.5px; background:var(--separator); }
   .setrow .n { font-size:16px; flex:1; }
   .setrow .v { color: var(--secondary-label); font-size: 15px; }
+  .chev { transition: transform .25s cubic-bezier(.32,.72,.33,1); display:inline-block; min-width:14px; text-align:center; }
   .switch { position:relative; width:51px; height:31px; flex-shrink:0; }
   .switch input { display:none; }
   .switch .trk { position:absolute; inset:0; border-radius:16px; background:var(--fill); transition:background .25s; cursor:pointer; }
@@ -629,15 +630,22 @@
       <input id="user-name-input" aria-label="Mon prénom" type="text" maxlength="20"
              style="width:120px;padding:8px;text-align:right;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:15px;color:var(--label);outline:none">
     </div>
-    <div class="setrow" onclick="showOnboarding()" role="button" tabindex="0" style="cursor:pointer">
-      <div class="icon-badge" style="background:rgba(175,82,222,.15)">🔄</div>
-      <div class="n">Revoir la présentation</div>
-      <div class="v">onboarding</div>
-    </div>
     <div class="setrow" onclick="openLangSheet()" role="button" tabindex="0" style="cursor:pointer">
       <div class="icon-badge" style="background:rgba(90,200,250,.15)">🌐</div>
       <div class="n" id="lang-row-label">Langue</div>
       <div class="v" id="lang-current"></div>
+    </div>
+    <div class="setrow">
+      <div class="icon-badge" style="background:rgba(0,122,255,.15)">💱</div>
+      <div class="n">Monnaie</div>
+      <select id="currency-select" aria-label="Devise" style="padding:8px 12px;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:15px;color:var(--label);outline:none">
+        <option value="€">Euro €</option>
+        <option value="$">Dollar $</option>
+        <option value="FCFA">FCFA</option>
+        <option value="£">Livre £</option>
+        <option value="CHF">Franc CHF</option>
+        <option value="CAD $">Dollar CAD</option>
+      </select>
     </div>
   </div>
   <div class="list-header"><span class="t">Budget</span></div>
@@ -649,6 +657,33 @@
              style="width:110px;padding:8px;text-align:right;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:16px;color:var(--label);outline:none">
       <span class="v" id="set-cur"></span>
     </div>
+    <div class="setrow" onclick="toggleDisclose('envelopes-edit', this)" role="button" tabindex="0" style="cursor:pointer" aria-expanded="false">
+      <div class="icon-badge" style="background:rgba(255,149,0,.15)">✉️</div>
+      <div class="n">Enveloppes</div>
+      <div class="v" id="env-count"></div>
+      <div class="v chev">▾</div>
+    </div>
+  </div>
+  <div id="envelopes-edit" style="display:none">
+    <div class="sub" style="padding:0 20px 6px;font-size:12px;color:var(--secondary-label)">Laisse une ligne vide pour n'utiliser que le budget global</div>
+    <div class="group" id="budgets-manage"></div>
+  </div>
+  <div class="group">
+    <div class="setrow" onclick="toggleDisclose('recurs-edit', this)" role="button" tabindex="0" style="cursor:pointer" aria-expanded="false">
+      <div class="icon-badge" style="background:rgba(88,86,214,.15)">🔁</div>
+      <div class="n">Récurrences</div>
+      <div class="v" id="rec-count"></div>
+      <div class="v chev">▾</div>
+    </div>
+  </div>
+  <div id="recurs-edit" style="display:none">
+    <div class="group" id="rec-manage"></div>
+    <div class="group">
+      <div class="setrow" onclick="openRecSheet()" role="button" tabindex="0" style="cursor:pointer">
+        <div class="icon-badge" style="background:rgba(88,86,214,.15)">➕</div>
+        <div class="n" style="color:var(--blue);font-weight:600">Ajouter une récurrence</div>
+      </div>
+    </div>
   </div>
   <div class="list-header"><span class="t">Catégories</span></div>
   <div class="group" id="cat-manage"></div>
@@ -656,17 +691,6 @@
     <div class="setrow" onclick="openCatSheet()" role="button" tabindex="0" style="cursor:pointer">
       <div class="icon-badge" style="background:rgba(0,122,255,.15)">➕</div>
       <div class="n" style="color:var(--blue);font-weight:600">Ajouter une catégorie</div>
-    </div>
-  </div>
-  <div class="list-header"><span class="t">Budgets par catégorie</span></div>
-  <div class="sub" style="padding:0 20px 6px;font-size:12px;color:var(--secondary-label)">Laisse une ligne vide pour n'utiliser que le budget global</div>
-  <div class="group" id="budgets-manage"></div>
-  <div class="list-header"><span class="t">Dépenses récurrentes</span><span class="v" id="rec-count"></span></div>
-  <div class="group" id="rec-manage"></div>
-  <div class="group">
-    <div class="setrow" onclick="openRecSheet()" role="button" tabindex="0" style="cursor:pointer">
-      <div class="icon-badge" style="background:rgba(88,86,214,.15)">🔁</div>
-      <div class="n" style="color:var(--blue);font-weight:600">Ajouter une récurrence</div>
     </div>
   </div>
   <div class="list-header"><span class="t">Budget couple</span></div>
@@ -701,21 +725,6 @@
       <div class="v">P2P</div>
     </div>
     <input type="file" id="couple-file" accept=".json,application/json" style="display:none">
-  </div>
-  <div class="list-header"><span class="t">Devise</span></div>
-  <div class="group">
-    <div class="setrow">
-      <div class="icon-badge" style="background:rgba(0,122,255,.15)">💱</div>
-      <div class="n">Monnaie</div>
-      <select id="currency-select" aria-label="Devise" style="padding:8px 12px;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:15px;color:var(--label);outline:none">
-        <option value="€">Euro €</option>
-        <option value="$">Dollar $</option>
-        <option value="FCFA">FCFA</option>
-        <option value="£">Livre £</option>
-        <option value="CHF">Franc CHF</option>
-        <option value="CAD $">Dollar CAD</option>
-      </select>
-    </div>
   </div>
   <div class="list-header"><span class="t">Données</span></div>
   <div class="group">
@@ -754,6 +763,11 @@
       <div class="icon-badge" style="background:rgba(90,200,250,.18)">📲</div>
       <div class="n">Installer l'application</div>
       <div class="v">→</div>
+    </div>
+    <div class="setrow" onclick="showOnboarding()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(175,82,222,.15)">🔄</div>
+      <div class="n">Revoir la présentation</div>
+      <div class="v">onboarding</div>
     </div>
   </div>
   <div class="group" style="margin-top:20px">
@@ -1572,6 +1586,7 @@ const I18N_EN = {
   "💾 Sauvegarde conseillée":"💾 Backup recommended",
   "Sauvegarder":"Back up",
   "Plus tard":"Later",
+  "Rappeler plus tard":"Remind me later",
   "Enveloppes du mois":"Monthly envelopes",
   "Objectifs d'épargne":"Savings goals",
   "＋ Objectif":"＋ Goal",
@@ -1768,6 +1783,8 @@ const I18N_EN = {
   "＋ Nouvelle dépense":"＋ New expense",
   /* --- divers --- */
   /* --- Budget couple --- */
+  "Enveloppes":"Envelopes",
+  "Récurrences":"Recurring expenses",
   "Couple":"Couple",
   "Budget couple":"Couple budget",
   "Budget couple activé":"Couple budget on",
@@ -2535,7 +2552,20 @@ function closeDelCatSheet(){
   delCatKey = null;
 }
 
+/* Réglages : sections dépliables (chevron) */
+function toggleDisclose(id, row){
+  const el = document.getElementById(id);
+  const open = el.style.display !== "none";
+  el.style.display = open ? "none" : "";
+  const chev = row && row.querySelector(".chev");
+  if (chev) chev.style.transform = open ? "" : "rotate(-90deg)";
+  if (row) row.setAttribute("aria-expanded", open ? "false" : "true");
+}
+
 function renderBudgets(){
+  const active = Object.keys(state.budgets || {}).filter(k => +state.budgets[k] > 0 && state.cats[k]).length;
+  const ec = document.getElementById("env-count");
+  if (ec) ec.textContent = active || "";
   const host = document.getElementById("budgets-manage");
   host.innerHTML = "";
   Object.entries(state.cats).forEach(([k,c])=>{
@@ -3325,9 +3355,10 @@ async function pairAcceptOffer(code){
   document.getElementById("pair-paste").value = code2;
   return true;
 }
-async function pairUsePaste(){
+async function pairUsePaste(codeArg){
   const ta = document.getElementById("pair-paste");
-  const code = (ta.value || "").trim();
+  const code = (codeArg || ta.value || "").trim();   // argument (rempli par test/P2P) sinon le champ
+
   if (!code) return;
   if (__pair && __pair.scanning) stopPairScan();
   if (__pair && __pair.role === "offer"){
