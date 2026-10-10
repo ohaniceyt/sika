@@ -1240,16 +1240,23 @@ function nextOccur(r, fromISO){
   const day = Math.min(+r.day||1, 28);
   return `${y2}-${String(m2).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
 }
+/* Première occurrence : toujours FUTURE (prochaine échéance) — pas d'ajout
+   rétroactif à la création : si l'échéance du mois courant est déjà passée,
+   on part du mois/lundi suivant. */
 function firstOccur(r){
   if (r.freq === "w"){
     const t = new Date();
     const today = new Date(t.getFullYear(), t.getMonth(), t.getDate());
     const monday = new Date(today); monday.setDate(today.getDate() - (today.getDay()+6)%7);
     const occ = new Date(monday); occ.setDate(monday.getDate() + (+r.wd||0));
+    if (occ < today) occ.setDate(occ.getDate() + 7);
     return ymd(occ);
   }
   const t = new Date();
-  return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,"0")}-${String(Math.min(+r.day||1,28)).padStart(2,"0")}`;
+  const occ = new Date(t.getFullYear(), t.getMonth(), Math.min(+r.day||1, 28));
+  const today = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+  if (occ < today) occ.setMonth(occ.getMonth() + 1);
+  return ymd(occ);
 }
 // Traite toutes les occurrences échues depuis la dernière passée ; zéro doublon par construction
 function processRecurring(){
@@ -1260,7 +1267,7 @@ function processRecurring(){
     const base = r.lastAdded || "";
     let occ = base && base <= today ? nextOccur(r, base) : firstOccur(r);
     let guard = 0;
-    while (occ <= today && guard < 40){
+    while (occ <= today && guard < 1200){   // garde-fou (reprise > 20 ans impossible en pratique)
       state.expenses.push({ id:crypto.randomUUID(), name:r.name, cat:r.cat, amount:+r.amount, date:occ });
       r.lastAdded = occ;
       changed = true;
@@ -1362,15 +1369,39 @@ function parseCsv(text){
   const first = rows[0].join(" ").toLowerCase();
   const hasHeader = /date|libell|libell|description|mont|amount/.test(first) && !/\d{2}[\/.-]\d{2}[\/.-]\d{2,4}/.test(first);
   const body = hasHeader ? rows.slice(1) : rows;
-  const out = [];
+  const rows2 = [];
+  let hasNegative = false;
   body.forEach(cells=>{
     // colonnes date / montant / libellé
     const dateIdx = cells.findIndex(c=>normalizeCsvDate(c));
     let amountIdx = -1, labelIdx = -1, amount = null;
-    for (let i=0;i<cells.length;i++){
-      if (i===dateIdx) continue;
-      const cand = parseMoneyCell(cells[i]);
-      if (cand!==null && amountIdx===-1){ amountIdx=i; amount=cand; }
+    // Liaison par en-tête (relevés 2 colonnes Débit/Crédit) : Débit/Montant = dépenses,
+    // Crédit = argent entrant, jamais une dépense — même si les débits y sont positifs.
+    let strictCol = -1, creditOnly = false;
+    if (hasHeader && rows[0].length === cells.length){
+      for (let i=0;i<cells.length;i++){
+        if (i===dateIdx) continue;
+        const h = String(rows[0][i]||"").toLowerCase();
+        if (/crédit|credit|dépôt|depot|deposit|income/.test(h)){ continue; }
+        if (/débit|debit|montant|amount|charge|spent/.test(h)){ strictCol = i; break; }
+      }
+      creditOnly = strictCol === -1 && [...cells.keys()].some(i=>{
+        if (i===dateIdx) return false;
+        const h = String(rows[0][i]||"").toLowerCase();
+        return /crédit|credit|dépôt|depot|deposit|income/.test(h) && parseMoneyCell(cells[i]) !== null;
+      });
+    }
+    if (strictCol > -1){
+      amountIdx = strictCol;
+      amount = parseMoneyCell(cells[amountIdx]);
+    } else if (creditOnly){
+      return;   // ligne dont le seul montant est un crédit
+    } else {
+      for (let i=0;i<cells.length;i++){
+        if (i===dateIdx) continue;
+        const cand = parseMoneyCell(cells[i]);
+        if (cand!==null && amountIdx===-1){ amountIdx=i; amount=cand; }
+      }
     }
     // libellé = la cellule non-date, non-montant la plus longue
     for (let i=0;i<cells.length;i++){
@@ -1379,8 +1410,12 @@ function parseCsv(text){
     }
     const date = dateIdx>=0 ? normalizeCsvDate(cells[dateIdx]) : null;
     if (!date || amount===null || !amount) return;
-    out.push({ date, label: labelIdx>=0 ? cells[labelIdx].slice(0,60) : "Dépense importée", amount: Math.abs(amount), cat: guessCat(labelIdx>=0 ? cells[labelIdx] : "") });
+    if (amount < 0) hasNegative = true;   // relevé signé : les positifs sont des crédits (virements reçus)
+    rows2.push({ date, label: labelIdx>=0 ? cells[labelIdx].slice(0,60) : "Dépense importée", amount, cat: guessCat(labelIdx>=0 ? cells[labelIdx] : "") });
   });
+  // Crédits ignorés — sauf relevé sans aucun signe négatif (tout positif = export sans signe : ce sont des dépenses)
+  const out = hasNegative ? rows2.filter(r=>r.amount < 0) : rows2;
+  out.forEach(r=> r.amount = Math.abs(r.amount));
   return out;
 }
 let csvRows = null;
@@ -1632,6 +1667,7 @@ const I18N_EN = {
   "Modes hors ligne : tes données restent disponibles":"Offline mode: your data stays available",
   "📲 L'app fonctionne hors ligne":"📲 The app works offline",
   "Supprimer TOUTES les dépenses ? Cette action est irréversible.":"Delete ALL expenses? This cannot be undone.",
+  "Supprimer TOUTES les données ? Dépenses, budgets, enveloppes, objectifs, récurrences et profil. Action irréversible.":"Delete ALL data? Expenses, budgets, envelopes, goals, recurring and profile. This cannot be undone.",
   "Supprimer":"Delete",
   "Modifier":"Edit",
   "Supprimer l'objectif":"Delete goal",
@@ -3101,8 +3137,11 @@ function toast(msg){
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove("show"),2200);
 }
 function resetAll(){
-  if (confirm("Supprimer TOUTES les dépenses ? Cette action est irréversible.")){
-    state.expenses=[]; idbErase(); save(); render(); toast("Données effacées");
+  if (confirm(tt("Supprimer TOUTES les données ? Dépenses, budgets, enveloppes, objectifs, récurrences et profil. Action irréversible.", {}))){
+    state.expenses = []; state.budgets = {}; state.budget = 0;
+    state.goals = []; state.recurring = []; state.user = { name: "" };
+    state.lastBackupAt = ""; state.lastMonthlyBackup = ""; state.backupPostponedAt = "";
+    idbErase(); save(); render(); toast("Données effacées");
   }
 }
 
