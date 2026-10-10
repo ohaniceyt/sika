@@ -19,7 +19,9 @@
 - **Hors ligne** : service worker, tout marche sans réseau
 
 ## Technique
-HTML/CSS/JS vanilla dans un seul `index.html` (~95 Ko), **zéro dépendance**, zéro serveur. Schéma de données versionné (v3), stockage `localStorage` (blindé contre la corruption), backup manuel encadré par un rappel automatique, focus-trap et `role="button"` sur les listes (clavier).
+HTML/CSS/JS vanilla dans un seul `index.html` (~100 Ko), **zéro dépendance**, zéro serveur. Schéma de données versionné (v3), stockage `localStorage` (blindé contre la corruption), backup manuel encadré par un rappel automatique + bandeau mensuel, focus-trap et `role="button"` sur les listes (clavier).
+
+Icônes : source vectorielle unique `icons/icon.svg` (~0,9 Ko) → PNG compressés palette (~10–12 Ko) + **écrans de démarrage iOS** light/dark (une taille exacte par appareil, `apple-touch-startup-image`). Régénérables en 1 commande : `node scripts/gen-ios-assets.mjs` (script dev, nécessite `npm i sharp`, pas déployé).
 
 Design : [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/) — SF Pro, couleurs système iOS, dark mode auto, safe-areas, header « liquid glass », sheets au ressort (`cubic-bezier(.32,.72,.33,1)`).
 
@@ -27,7 +29,8 @@ Design : [Apple Human Interface Guidelines](https://developer.apple.com/design/h
 - `index.html` — l'app complète (markup, styles, logique)
 - `manifest.webmanifest` — manifeste PWA
 - `sw.js` — service worker (network-first sur les navigations, offline-first)
-- `icons/` — icônes (SVG source vecteur + PNG 192/512)
+- `icons/` — icônes (SVG source vecteur + PNG 180/192/512) et `icons/splash/` — écrans de démarrage iOS
+- `scripts/gen-ios-assets.mjs` — générateur dev des PNG (script, pas déployé)
 
 ## Licence
 MIT.
