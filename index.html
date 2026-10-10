@@ -719,7 +719,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.24 alpha</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.24 bêta</div></div>
   </div>
 </div>
 
@@ -1357,11 +1357,11 @@ function closeCsvSheet(){
 function confirmCsvImport(){
   if (!csvRows || !csvRows.length) return;
   let added = 0;
+  const have = new Set(state.expenses.map(e=>e.date + "|" + e.name + "|" + Math.round(+e.amount*100)));   // Set : O(1) par ligne (20k+ dépenses = O(n) au total)
   csvRows.forEach(r=>{
-    // pas de doublon exact (même date, même libellé, même montant)
-    const dup = state.expenses.some(e=>e.date===r.date && e.name===r.label && Math.abs(e.amount-r.amount) < 0.005);
-    if (dup) return;
+    if (have.has(r.date + "|" + r.label + "|" + Math.round(+r.amount*100))) return;   // pas de doublon exact (même date, même libellé, même montant)
     state.expenses.push({ id:crypto.randomUUID(), name:r.label, cat: r.cat in state.cats ? r.cat : "other", amount:r.amount, date:r.date });
+    have.add(r.date + "|" + r.label + "|" + Math.round(+r.amount*100));
     added++;
   });
   csvRows = null;
@@ -1526,6 +1526,13 @@ const I18N_EN = {
   "Catégories devinées automatiquement — modifiables après en tapant une dépense.":"Categories guessed automatically — editable afterwards by tapping an expense.",
   "Rien de nouveau à importer":"Nothing new to import",
   "Passer sur un autre appareil":"Move to another device",
+  "Sika ne transmet rien du tout : tu passes par un fichier. La ligne rouge du 100% local reste intacte.":"Sika sends nothing at all: you go through a file. The 100% local red line stays intact.",
+  "Ici : Réglages → Sauvegarde complète (JSON)":"Here: Settings → Full backup (JSON)",
+  "Envoie le fichier par Mail, AirDrop ou WhatsApp":"Send the file by Mail, AirDrop or WhatsApp",
+  "Sur le nouvel appareil : Restaurer une sauvegarde → choisis fusionner":"On the new device: Restore a backup → choose merge",
+  "Fusionner (ajoute, sans doublon)":"Merge (adds, no duplicates)",
+  "Remplacer tout":"Replace everything",
+  "Fusionner : ajoute les dépenses absentes de cet appareil (id + libellé + montant + date identiques = ignorées) et complète catégories et objectifs. Remplacer : efface tout ici et restaure tel quel.":"Merge: adds expenses missing from this device (same id + label + amount + date = skipped) and completes categories and goals. Replace: erases everything here and restores as is.",
   "guide":"guide",
   "OK":"OK",
   "Aucun doublon à la fusion":"No duplicates on merge",
@@ -1668,7 +1675,15 @@ function i18nWalk(root){
       const en = I18N_EN[key];
       if (en === undefined || en === key) continue;
       if (!__i18nText.has(n)) __i18nText.set(n, raw);
-      n.nodeValue = key === raw ? en : raw.replace(key, en);
+      // write-back : la key (espaces normalisés) peut différer du raw
+      // (espaces insécables FR, double espaces) → matching regex \s+ flexible,
+      // sinon replace sans effet et le node reste en FR
+      if (key === raw) n.nodeValue = en;
+      else {
+        const pat = new RegExp(key.split(/\s+/).map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("\\s+"));
+        const out = raw.replace(pat, en);
+        if (out !== raw) n.nodeValue = out;
+      }
     }
   }
   root.querySelectorAll && root.querySelectorAll("[placeholder],[aria-label],[title]").forEach(el=>{
@@ -1740,10 +1755,20 @@ function ymd(d){
 }
 // Parse une saisie de montant : accepte "12,50" / "12.50" / "1 200,5"
 function parseAmount(str){
+  // Formats acceptés : « 1250 », « 1 250 », « 1 250,50 », « 1,250.50 » (EN), « 1.250,50 », « 12,50 »
+  // Règle : si les deux séparateurs sont présents, le DERNIER est la décimale (l'anti-ambiguïté) ;
+  // sinon une virgule suivie d'exactement 3 chiffres répétés = milliers (EN), sinon la virgule est décimale.
   if (typeof str !== "string") str = String(str ?? "");
-  const cleaned = str.replace(/[\s ]/g, "").replace(/,/g, ".");
-  const parts = cleaned.split(".");
-  const v = parts.length > 2 ? parseFloat(parts[0] + "." + parts.slice(1).join("")) : parseFloat(cleaned);
+  let s = str.replace(/[\s\u202F\u00A0'\u2009]/g, "").replace(/[^[0-9],.]/g, "");
+  const firstDot = s.indexOf("."), firstComma = s.indexOf(",");
+  if (firstDot > -1 && firstComma > -1){
+    if (firstComma > firstDot) s = s.replace(/\./g, "").replace(/,/g, ".");   // « 1.250,50 »
+    else s = s.replace(/,/g, "");                                             // « 1,250.50 »
+  } else if (firstComma > -1){
+    if (/^[0-9]{1,3}(,[0-9]{3})+$/.test(s)) s = s.replace(/,/g, "");          // « 1,250 » ou « 1,250,000 »
+    else s = s.replace(/,/g, ".");                                            // « 1250,50 » / « 12,50 »
+  }
+  const v = parseFloat(s);
   return isNaN(v) ? 0 : v;
 }
 function catOf(k){ return state.cats[k] || { label:"Divers", emoji:"📦", color:"#8e8e93" }; }
@@ -2629,6 +2654,7 @@ function buildBackup(s){
   const knownCat = k => Object.prototype.hasOwnProperty.call(catsSrc, k) ? k : null;
   return {
     v: SCHEMA_VERSION,
+    rev: +s.rev || 0,   // ⚠️ conservé : sans lui, la copie IndexedDB de l'appareil (rev plus haute) écraserait le fichier restauré au prochain boot
     budget: +s.budget || 0,
     currency: s.currency || "€",
     onboarded: true,
@@ -2665,10 +2691,10 @@ function openBackupSheet(bk){
   document.getElementById("backup-title").textContent = t("Restaurer une sauvegarde");
   document.getElementById("backup-preview").innerHTML =
     `<div class="empty" style="padding:4px 0 6px">
-      📂 ${bk.exportedAt ? tt("Sauvegarde du {d} · ", {d: bk.exportedAt}) : ""}${tt("{n} dépense(s)", {n: bk.expenses.length})} · ${(bk.goals||[]).length} ${t("objectif(s)")} · ${(bk.recurring||[]).length} ${t("récurrence(s)")}
-      ${bk.currency !== state.currency ? "<br>⚠️ " + tt("Devise du fichier : {a} (cette devise ici : {b})", {a: bk.currency, b: state.currency}) : ""}
+      📂 ${bk.exportedAt ? esc(tt("Sauvegarde du {d} · ", {d: bk.exportedAt})) : ""}${tt("{n} dépense(s)", {n: bk.expenses.length})} · ${(bk.goals||[]).length} ${t("objectif(s)")} · ${(bk.recurring||[]).length} ${t("récurrence(s)")}
+      ${bk.currency !== state.currency ? "<br>⚠️ " + tt("Devise du fichier : {a} (cette devise ici : {b})", {a: esc(bk.currency||"—"), b: state.currency}) : ""}
       <br><b>${dups ? tt("{n} doublon(s) ignoré(s) à la fusion", {n: dups}) : t("Aucun doublon à la fusion")}</b>
-      ${cur ? "" : "<br>" + tt("Fichier de {a} — nom adopté", {a: (bk.user.name||"—")})}
+      ${cur ? "" : "<br>" + esc(tt("Fichier de {a} — nom adopté", {a: (bk.user.name||"—")}))}
     </div>`;
   document.getElementById("overlay").classList.add("show"); syncScrollLock();
   document.getElementById("backup-sheet").classList.add("show"); syncScrollLock();
@@ -2714,7 +2740,9 @@ function applyBackupMerge(){
 function applyBackupReplace(){
   const bk = backupPending; if (!bk) return;
   if (!confirm(tt("Remplacer TOUTES les données de cet appareil par le fichier ({n} dépense(s)) ?", {n: bk.expenses.length}))) return;
+  const ownRev = +state.rev || 0;       // rev locale (au moins celle de la copie IDB, sinon l'IDB écraserait le remplacement au boot suivant)
   state = bk;
+  state.rev = Math.max(ownRev, +bk.rev || 0);
   state.lastBackupAt = ymd(new Date());
   closeBackupSheet();
   save(); renderHistFilter(); switchTab("home"); render();
@@ -3128,7 +3156,7 @@ applyI18n();
 __i18nObs.observe(document.body, { childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:["placeholder","aria-label","title"] });
 render();
 if (!state.onboarded) showOnboarding();
-})();
+})().catch(err => { console.error("Sika : échec de l'init", err); toast("⚠️ Erreur au démarrage"); });
 /* (le bloc PWA, ci-dessous, n'a pas besoin de state : il reste hors du IIFE async) */
 
 /* ============ PWA ============ */

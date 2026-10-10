@@ -1,5 +1,5 @@
 /* Sika — service worker (network-first pour l'app shell, offline-first pour le reste) */
-const CACHE = "sika-v17";
+const CACHE = "sika-v18";
 // Les splash screens iOS (icons/splash/) ne sont PAS pré-cachés : ~150 Ko à l'install
 // pour un usage qui n'est pas hors-ligne critique. Ils entrent au cache runtime
 // (offline-first) dès la première consultation en ligne.
