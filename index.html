@@ -3054,24 +3054,23 @@ enableSwipeClose(document.getElementById("device-sheet"), closeDeviceSheet);
 enableSwipeClose(document.getElementById("edit-cat-sheet"), closeEditCatSheet);
 document.getElementById("cat-edit-name").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); saveEditCat(); } });
 
+// ---- Pavé numérique (écrans tactiles) ----
+const KP_TOUCH = window.matchMedia("(hover:none) and (pointer:coarse)").matches;
+function syncKpDisplay(){
+  const v = document.getElementById("in-amount").value;
+  document.getElementById("kp-display").textContent = v.replace(".", ",") || "0,00";
+}
+function renderLegendModeButtons(){
+  const m = state.legendMode || "amt";
+  document.querySelectorAll(".legend-mode button").forEach(b=>b.classList.toggle("on", b.dataset.m===m));
+}
+
 /* ============ Init ============ */
-(async () => {
-await load();   // IndexedDB ⇄ localStorage (async)
-document.getElementById("today-date").textContent = new Date().toLocaleDateString(I18N_LOCALE(),{weekday:'long',day:'numeric',month:'long'});
-document.getElementById("budget-input").value = state.budget;
-document.getElementById("currency-select").value = state.currency;
 document.getElementById("user-name-input").addEventListener("change", e=>{
   state.user.name = e.target.value.trim(); save(); updateGreeting(); toast("Profil mis à jour");
 });
 document.getElementById("ob-name").addEventListener("keydown", e=>{ if(e.key==="Enter") obGo(2); });
 document.getElementById("ob-budget").addEventListener("keydown", e=>{ if(e.key==="Enter") obGo(4); });
-
-// Sélecteur % / Montant des donuts (préférence partagée accueil + stats)
-function renderLegendModeButtons(){
-  const m = state.legendMode || "amt";
-  document.querySelectorAll(".legend-mode button").forEach(b=>b.classList.toggle("on", b.dataset.m===m));
-}
-renderLegendModeButtons();
 document.querySelectorAll(".legend-mode").forEach(seg=>{
   seg.addEventListener("click", e=>{
     const b=e.target.closest("button"); if(!b) return;
@@ -3079,13 +3078,6 @@ document.querySelectorAll(".legend-mode").forEach(seg=>{
     render();
   });
 });
-
-// ---- Pavé numérique (écrans tactiles) ----
-const KP_TOUCH = window.matchMedia("(hover:none) and (pointer:coarse)").matches;
-function syncKpDisplay(){
-  const v = document.getElementById("in-amount").value;
-  document.getElementById("kp-display").textContent = v.replace(".", ",") || "0,00";
-}
 {
   document.getElementById("keypad").addEventListener("click", e=>{
     const b = e.target.closest("button"); if(!b) return;
@@ -3124,6 +3116,13 @@ document.getElementById("ob-budget").addEventListener("input", ()=>{
   document.getElementById("ob-btn-budget").textContent =
     parseAmount(document.getElementById("ob-budget").value) > 0 ? "Continuer" : "Continuer sans budget";
 });
+/* Boot async : rien de ci-dessus ne touche state ; tout ce qui suit, oui */
+(async () => {
+await load();   // IndexedDB ⇄ localStorage
+document.getElementById("today-date").textContent = new Date().toLocaleDateString(I18N_LOCALE(),{weekday:'long',day:'numeric',month:'long'});
+document.getElementById("budget-input").value = state.budget;
+document.getElementById("currency-select").value = state.currency;
+renderLegendModeButtons();
 renderHistFilter();
 applyI18n();
 __i18nObs.observe(document.body, { childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:["placeholder","aria-label","title"] });
