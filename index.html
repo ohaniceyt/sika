@@ -498,7 +498,7 @@
   <div class="card" id="backup-card" style="display:none">
     <div class="bk-row">
       <div style="flex:1;min-width:0">
-        <div style="font-size:15px;font-weight:700">💾 Sauvegarde conseillée</div>
+        <div style="font-size:15px;font-weight:700" id="bk-title">💾 Sauvegarde conseillée</div>
         <div class="bk-sub" id="bk-sub"></div>
       </div>
       <button class="bk-btn" onclick="exportBackup()">Sauvegarder</button>
@@ -688,7 +688,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.22 alpha</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.22 bêta</div></div>
   </div>
 </div>
 
@@ -809,6 +809,18 @@
   <button class="btn-primary" onclick="saveExpense()">Ajouter la dépense</button>
 </div>
 
+<div class="sheet" id="delcat-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2 id="delcat-title">Supprimer la catégorie</h2>
+  <p class="hint" id="delcat-sub" style="margin-top:2px"></p>
+  <div class="field" id="delcat-move">
+    <label>Déplacer vers</label>
+    <select id="delcat-target" aria-label="Catégorie de destination" style="width:100%;margin-top:6px;padding:13px 14px;font-size:17px;border:0;border-radius:12px;background:var(--fill);color:var(--label);outline:none"></select>
+  </div>
+  <button class="btn-primary" id="delcat-go" onclick="confirmDeleteCat()">Tout réaffecter et supprimer</button>
+  <button class="btn-ghost" onclick="closeDelCatSheet()">Annuler</button>
+</div>
+
 <div class="sheet" id="cat-sheet" role="dialog" aria-modal="true">
   <div class="grabber"></div>
   <h2>Nouvelle catégorie</h2>
@@ -829,7 +841,7 @@
 
 <div class="sheet" id="rec-sheet" role="dialog" aria-modal="true">
   <div class="grabber"></div>
-  <h2>Nouvelle récurrence</h2>
+  <h2 id="rec-title">Nouvelle récurrence</h2>
   <div class="field">
     <label>Montant (par mois)</label>
     <div class="amount-input">
@@ -864,8 +876,9 @@
       <option value="6">Dimanche</option>
     </select>
   </div>
-  <button class="btn-primary" onclick="saveRecurring()">Programmer la récurrence</button>
-  <p class="hint">Seront ajoutées automatiquement chaque mois, même en ouvrant l'app une fois par mois.</p>
+  <button class="btn-primary" id="rec-submit" onclick="saveRecurring()">Programmer la récurrence</button>
+  <button class="btn-ghost" id="rec-delete" style="display:none" onclick="deleteRecFromEdit()">Arrêter la récurrence</button>
+  <p class="hint" id="rec-hint">Seront ajoutées automatiquement chaque mois, même en ouvrant l'app une fois par mois.</p>
 </div>
 
 <div class="sheet" id="goal-sheet" role="dialog" aria-modal="true">
@@ -941,6 +954,7 @@
     <input id="edit-date" aria-label="Date" type="date" style="width:100%;margin-top:6px;padding:13px 14px;font-size:17px;border:0;border-radius:12px;background:var(--fill);color:var(--label);outline:none">
   </div>
   <button class="btn-primary" onclick="saveEdit()">Enregistrer</button>
+  <button class="btn-ghost" onclick="duplicateFromEdit()">＋ Même dépense aujourd'hui</button>
   <button class="btn-ghost" onclick="deleteFromEdit()">Supprimer la dépense</button>
 </div>
 
@@ -1067,15 +1081,22 @@ function renderRecurring(){
     host.innerHTML = '<div class="setrow"><div class="n" style="color:var(--secondary-label);font-size:14px">Aucune dépense récurrente</div></div>';
     return;
   }
-  state.recurring.forEach((r,i)=>{
+  state.recurring.forEach((r)=>{
     const c = catOf(r.cat);
     const row = document.createElement("div"); row.className = "setrow";
+    row.setAttribute("role","button"); row.tabIndex = 0;
+    row.setAttribute("aria-label", `Modifier la récurrence ${r.name}`);
     row.innerHTML = `<div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
       <div class="n">${esc(r.name)}<div style="font-size:12px;color:var(--secondary-label)">${money(+r.amount)} · ${r.freq==="w" ? "chaque "+["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"][+r.wd||0] : "le "+r.day+" de chaque mois"}</div></div>`;
+    row.onclick = ()=>openRecEdit(r);
+    row.onkeydown = e => { if (e.key==="Enter" || e.key===" "){ e.preventDefault(); openRecEdit(r); } };
     const del = document.createElement("button"); del.className = "del-btn"; del.textContent = "✕";
     del.setAttribute("aria-label","Supprimer");
-    del.onclick = ()=>{ if (confirm(`Arrêter la récurrence de « ${r.name} » ?`)){
-      state.recurring.splice(i,1); save(); renderRecurring(); toast("Récurrence arrêtée"); } };
+    const delFlow = ()=>{ if (confirm(`Arrêter la récurrence de « ${r.name} » ?`)){
+      const idx = state.recurring.indexOf(r);
+      if (idx > -1) state.recurring.splice(idx, 1);
+      save(); renderRecurring(); render(); toast("Récurrence arrêtée"); } };
+    del.onclick = ev=>{ ev.stopPropagation(); delFlow(); };
     row.appendChild(del);
     host.appendChild(row);
   });
@@ -1280,6 +1301,10 @@ function postponeBackup(){
   state.backupPostponedAt = ymd(d); save(); render();
   toast("On te rappelle dans 3 jours");
 }
+function prevMonthKey(){
+  const t = new Date();
+  return ymd(new Date(t.getFullYear(), t.getMonth()-1, 1)).slice(0,7);
+}
 function backupReminder(){
   const card = document.getElementById("backup-card");
   const n = state.expenses.length;
@@ -1288,11 +1313,26 @@ function backupReminder(){
   const backed = state.lastBackupAt || "";
   const postponed = state.backupPostponedAt || "";
   const today = todayISO();
+  const paused = postponed && postponed > today;
+  if (paused){ card.style.display = "none"; return; }
+  // Bandeau mensuel : dans les 7 premiers jours du mois, proposer d'archiver le mois précédent
+  const pmKey = prevMonthKey();
+  const prevCount = state.expenses.filter(e=>e.date.startsWith(pmKey)).length;
+  const monthly = new Date().getDate() <= 7 && prevCount > 0 && state.lastMonthlyBackup !== pmKey;
+  if (monthly){
+    const pmLabel = new Date(pmKey+"T12:00:00").toLocaleDateString("fr-FR",{month:"long", year:"numeric"});
+    card.style.display = "block";
+    document.getElementById("bk-title").textContent = "📊 Fin de " + pmLabel.split(" ")[0] + " — sauvegarde du mois";
+    document.getElementById("bk-sub").textContent =
+      `${prevCount} dépense${prevCount>1?"s":""} en ${pmLabel} : archive-les dans un fichier JSON avant de tourner la page`;
+    return;
+  }
+  // Rappel hebdomadaire (comportement historique)
   const since = backed ? Math.floor((new Date(today+"T12:00:00") - new Date(backed+"T12:00:00"))/DAY) : 999;
   const stale = !backed || (changed && changed > backed) || since > 7;
-  const paused = postponed && postponed > today;
-  if (stale && !paused){
+  if (stale){
     card.style.display = "block";
+    document.getElementById("bk-title").textContent = "💾 Sauvegarde conseillée";
     document.getElementById("bk-sub").textContent = backed
       ? `Dernière sauvegarde : il y a ${since} jour${since>1?"s":""}`
       : "Aucune sauvegarde depuis la création — ton historique mérite un fichier";
@@ -1525,11 +1565,20 @@ function deleteFromEdit(){
   clearSheetOverlay();
   deleteFlow(id);
 }
+function duplicateFromEdit(){
+  const e = state.expenses.find(x=>x.id===editId); if(!e) return;
+  const a = parseAmount(document.getElementById("edit-amount").value) || +e.amount;
+  const cat = document.getElementById("edit-cat").value;
+  const name = document.getElementById("edit-name").value.trim() || catOf(cat).label;
+  state.expenses.push({ id:crypto.randomUUID(), name, cat, amount:a, date:todayISO() });
+  save(); clearSheetOverlay(); closeEditSheet(); render();
+  toast("＋ Dupliquée pour aujourd'hui");
+}
 function clearSheetOverlay(){
   document.getElementById("overlay").classList.remove("show"); syncScrollLock();
 }
 function closeAllSheets(){
-  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet();
+  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet();
   closeOpenSwipe();
   clearSheetOverlay();
 }
@@ -1613,29 +1662,56 @@ function attachSwipe(wrap, front, onEdit, onDelete){
   });
 }
 
+let delCatKey = null;
 function deleteCat(k){
   if (Object.keys(state.cats).length <= 1){ toast("Il faut au moins une catégorie"); return; }
   const c = state.cats[k];
   const count = state.expenses.filter(e=>e.cat===k).length;
-  let msg = `Supprimer la catégorie « ${c.label} » ?`;
-  if (count){
-    if (state.cats["other"] && k !== "other"){
-      msg += `\n${count===1?"1 dépense":count+" dépenses"} seront déplacées dans « ${state.cats["other"].label} ».`;
-    } else {
-      toast("Impossible : garde « Autre » pour réaffecter les dépenses");
-      return;
-    }
+  const recCount = (state.recurring||[]).filter(r=>r.cat===k).length;
+  if (!count && !recCount){
+    if (!confirm(`Supprimer la catégorie « ${c.label} » ?`)) return;
+    applyDeleteCat(k, null);
+    return;
   }
-  if (!confirm(msg)) return;
-  if (count && state.cats["other"] && k !== "other"){
-    state.expenses.forEach(e=>{ if (e.cat===k) e.cat = "other"; });
-    state.recurring.forEach(r=>{ if (r.cat===k) r.cat = "other"; });
+  delCatKey = k;
+  document.getElementById("delcat-title").textContent = `Supprimer « ${c.label} » ?`;
+  const parts = [];
+  if (count) parts.push(count===1 ? "1 dépense" : `${count} dépenses`);
+  if (recCount) parts.push(recCount===1 ? "1 récurrence" : `${recCount} récurrences`);
+  document.getElementById("delcat-sub").textContent = `${parts.join(" et ")} utilisent cette catégorie. Où les déplacer ?`;
+  const sel = document.getElementById("delcat-target");
+  sel.innerHTML = Object.entries(state.cats).filter(([key])=>key!==k).map(([key,c2])=>
+    `<option value="${key}" ${key==="other"?"selected":""}>${esc(c2.emoji)} ${esc(c2.label)}</option>`).join("");
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("delcat-sheet").classList.add("show"); syncScrollLock();
+}
+function confirmDeleteCat(){
+  if (!delCatKey) return;
+  const target = document.getElementById("delcat-target").value
+    || Object.keys(state.cats).find(x=>x!==delCatKey);
+  applyDeleteCat(delCatKey, target);
+}
+function applyDeleteCat(k, target){
+  const c = state.cats[k];
+  if (target){
+    state.expenses.forEach(e=>{ if (e.cat===k) e.cat = target; });
+    (state.recurring||[]).forEach(r=>{ if (r.cat===k) r.cat = target; });
   }
   delete state.cats[k];
   if (state.budgets) delete state.budgets[k];
   if (pickedCat === k) pickedCat = Object.keys(state.cats)[0] || "other";
+  // l'historique filtré sur la catégorie supprimée serait vide : reset
+  const histFilterEl = document.getElementById("hist-filter");
+  if (histFilterEl && histFilterEl.dataset.c === k){ histFilterEl.dataset.c = "all"; }
+  delCatKey = null;
+  closeDelCatSheet(); clearSheetOverlay();
   save(); renderHistFilter(); renderCatGrid(); render();
-  toast(`« ${c.label} » supprimée`);
+  toast(target ? `« ${c.label} » supprimée — tout déplacé vers « ${catOf(target).label} »` : `« ${c.label} » supprimée`);
+}
+function closeDelCatSheet(){
+  document.getElementById("delcat-sheet").classList.remove("show");
+  clearSheetOverlay();
+  delCatKey = null;
 }
 
 function renderBudgets(){
@@ -1821,10 +1897,16 @@ function deleteGoal(id){
 }
 
 /* ============ Récurrences (UI) ============ */
+let editRec = null;   // objet récurrence en cours d'édition (null = création)
 function openRecSheet(){
+  editRec = null;
   document.getElementById("rec-cur").textContent = state.currency;
   const sel = document.getElementById("rec-cat");
   sel.innerHTML = Object.entries(state.cats).map(([k,c])=>`<option value="${k}">${esc(c.emoji)} ${esc(c.label)}</option>`).join("");
+  document.getElementById("rec-title").textContent = "Nouvelle récurrence";
+  document.getElementById("rec-submit").textContent = "Programmer la récurrence";
+  document.getElementById("rec-delete").style.display = "none";
+  document.getElementById("rec-hint").style.display = "";
   document.getElementById("rec-amount").value = "";
   document.getElementById("rec-name").value = "";
   document.getElementById("rec-day").value = "";
@@ -1834,6 +1916,37 @@ function openRecSheet(){
   document.getElementById("overlay").classList.add("show"); syncScrollLock();
   document.getElementById("rec-sheet").classList.add("show"); syncScrollLock();
   setTimeout(()=>document.getElementById("rec-amount").focus(), 460);
+}
+function openRecEdit(r){
+  editRec = r;
+  document.getElementById("rec-cur").textContent = state.currency;
+  const sel = document.getElementById("rec-cat");
+  sel.innerHTML = Object.entries(state.cats).map(([k,c])=>`<option value="${k}">${esc(c.emoji)} ${esc(c.label)}</option>`).join("");
+  sel.value = r.cat in state.cats ? r.cat : Object.keys(state.cats)[0];
+  document.getElementById("rec-title").textContent = "Modifier la récurrence";
+  document.getElementById("rec-submit").textContent = "Enregistrer les changements";
+  document.getElementById("rec-delete").style.display = "";
+  document.getElementById("rec-hint").style.display = "none";
+  document.getElementById("rec-amount").value = +(+r.amount).toFixed(2);
+  document.getElementById("rec-name").value = r.name;
+  document.getElementById("rec-day").value = r.freq==="m" ? (r.day||1) : "";
+  document.getElementById("rec-wd").value = String(r.wd||0);
+  setRecFreq(r.freq || "m");
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("rec-sheet").classList.add("show"); syncScrollLock();
+}
+function closeRecSheet(){
+  document.getElementById("rec-sheet").classList.remove("show");
+  editRec = null;
+}
+function deleteRecFromEdit(){
+  if (!editRec) return;
+  const r = editRec;
+  if (!confirm(`Arrêter la récurrence de « ${r.name} » ?`)) return;
+  const idx = state.recurring.indexOf(r);
+  if (idx > -1) state.recurring.splice(idx, 1);
+  save(); closeRecSheet(); clearSheetOverlay(); renderRecurring(); render();
+  toast("Récurrence arrêtée");
 }
 function closeRecSheet(){ document.getElementById("rec-sheet").classList.remove("show"); }
 function setRecFreq(f){
@@ -1848,7 +1961,18 @@ function saveRecurring(){
   const freq = document.getElementById("rec-freq").querySelector(".on").dataset.f;
   const d = Math.min(Math.max(parseInt(document.getElementById("rec-day").value)||1, 1), 28);
   const wd = +document.getElementById("rec-wd").value;
-  state.recurring.push({ name:n||"Dépense récurrente", cat:document.getElementById("rec-cat").value,
+  const cat = document.getElementById("rec-cat").value;
+  if (editRec){
+    const r = editRec;
+    const schedChanged = r.freq !== freq || (freq === "m" ? (+r.day||1) !== d : (+r.wd||0) !== wd);
+    Object.assign(r, { name:n||r.name||"Dépense récurrente", cat, amount:a, freq, day:freq==="m"?d:1, wd });
+    if (schedChanged) r.lastAdded = "";   // le programme a changé : reprise depuis la prochaine occurrence du nouveau calendrier
+    processRecurring();
+    save(); closeSheet(); closeRecSheet(); render();
+    toast("✓ Récurrence mise à jour");
+    return;
+  }
+  state.recurring.push({ name:n||"Dépense récurrente", cat,
     amount:a, freq, day:freq==="m"?d:1, wd, lastAdded:"" });
   processRecurring();
   save(); closeSheet(); closeRecSheet(); render();
@@ -1942,7 +2066,9 @@ function exportBackup(){
   a.href = "data:application/json;charset=utf-8," + encodeURIComponent(data);
   a.download = "sika-sauvegarde-" + todayISO() + ".json";
   document.body.appendChild(a); a.click(); a.remove();
-  state.lastBackupAt = ymd(new Date()); save();
+  state.lastBackupAt = ymd(new Date());
+  state.lastMonthlyBackup = prevMonthKey();   // toute sauvegarde couvre aussi les mois passés
+  save();
   render();
   toast("💾 Sauvegarde exportée");
 }
@@ -2283,6 +2409,7 @@ document.addEventListener("input", e=>{
 enableSwipeClose(document.getElementById("sheet"), closeSheet);
 enableSwipeClose(document.getElementById("cat-sheet"), closeCatSheet);
 enableSwipeClose(document.getElementById("rec-sheet"), ()=>{ closeSheet(); closeRecSheet(); });
+enableSwipeClose(document.getElementById("delcat-sheet"), ()=>{ closeDelCatSheet(); clearSheetOverlay(); });
 enableSwipeClose(document.getElementById("goal-sheet"), ()=>{ closeSheet(); closeGoalSheets(); });
 enableSwipeClose(document.getElementById("goal-contrib-sheet"), ()=>{ closeSheet(); closeGoalSheets(); });
 enableSwipeClose(document.getElementById("edit-sheet"), ()=>{ closeEditSheet(); clearSheetOverlay(); syncScrollLock(); });
