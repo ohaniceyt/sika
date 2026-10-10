@@ -527,6 +527,11 @@
     </div>
   </div>
 
+  <div class="card" id="couple-summary" style="display:none">
+    <div class="list-header" style="padding:0 0 6px"><span class="t" style="font-size:17px" id="couple-title">Couple</span></div>
+    <div id="couple-split"></div>
+  </div>
+
   <div class="card" id="envelopes-card">
     <div class="list-header" style="padding:0 0 6px"><span class="t" style="font-size:17px">Enveloppes du mois</span></div>
     <div id="envelopes"></div>
@@ -663,6 +668,39 @@
       <div class="icon-badge" style="background:rgba(88,86,214,.15)">🔁</div>
       <div class="n" style="color:var(--blue);font-weight:600">Ajouter une récurrence</div>
     </div>
+  </div>
+  <div class="list-header"><span class="t">Budget couple</span></div>
+  <div class="sub" style="padding:0 20px 6px;font-size:12px;color:var(--secondary-label)">Deux téléphones, un budget — chaque téléphone exporte son fichier d'échange, l'autre l'importe. 100% local.</div>
+  <div class="group">
+    <div class="setrow">
+      <div class="icon-badge" style="background:rgba(255,45,85,.14)">💑</div>
+      <div class="n">Budget couple
+        <div class="bk-sub">Partage des dépenses par échange de fichier</div>
+      </div>
+      <label class="switch"><input type="checkbox" id="couple-on" aria-label="Activer le budget couple"><div class="trk"></div><div class="knb"></div></label>
+    </div>
+    <div class="setrow" id="couple-partner-row" style="display:none">
+      <div class="icon-badge" style="background:rgba(88,86,214,.15)">👤</div>
+      <div class="n">Prénom du partenaire</div>
+      <input id="partner-name-input" aria-label="Prénom du partenaire" type="text" maxlength="20"
+             style="width:120px;padding:8px;text-align:right;border:0;border-radius:8px;background:var(--fill);font-family:inherit;font-size:15px;color:var(--label);outline:none">
+    </div>
+    <div class="setrow" id="couple-export-row" style="display:none;cursor:pointer" onclick="exportCouple()" role="button" tabindex="0">
+      <div class="icon-badge" style="background:rgba(52,199,89,.15)">📤</div>
+      <div class="n">Fichier d'échange pour le partenaire</div>
+      <div class="v" id="couple-last">jamais</div>
+    </div>
+    <div class="setrow" id="couple-import-row" style="display:none;cursor:pointer" onclick="document.getElementById('couple-file').click()" role="button" tabindex="0">
+      <div class="icon-badge" style="background:rgba(0,122,255,.15)">📥</div>
+      <div class="n">Importer le fichier du partenaire</div>
+      <div class="v">.json</div>
+    </div>
+    <div class="setrow" id="couple-pair-row" style="display:none;cursor:pointer" onclick="openPairSheet()" role="button" tabindex="0">
+      <div class="icon-badge" style="background:rgba(88,86,214,.15)">🔗</div>
+      <div class="n">Synchroniser maintenant (Wi-Fi)</div>
+      <div class="v">P2P</div>
+    </div>
+    <input type="file" id="couple-file" accept=".json,application/json" style="display:none">
   </div>
   <div class="list-header"><span class="t">Devise</span></div>
   <div class="group">
@@ -837,6 +875,14 @@
     <label>Catégorie</label>
     <div class="cat-grid" id="cat-grid"></div>
   </div>
+  <div class="field" id="who-field" style="display:none">
+    <label>Qui a payé ?</label>
+    <div class="segmented mini" id="who-seg" role="group" aria-label="Qui a payé">
+      <button class="on" data-w="me" type="button">Moi</button>
+      <button data-w="partner" id="who-partner-btn" type="button">Toi</button>
+      <button data-w="shared" type="button">À deux</button>
+    </div>
+  </div>
   <button class="btn-primary" onclick="saveExpense()">Ajouter la dépense</button>
   <button class="btn-ghost" onclick="ocrPick()">📷 Photo du reçu</button>
 </div>
@@ -874,6 +920,14 @@
     <div class="field">
       <label>Catégorie</label>
       <select id="ocr-cat" aria-label="Catégorie" style="width:100%;padding:13px 14px;font-size:17px;border:0;border-radius:12px;background:var(--fill);color:var(--label);outline:none"></select>
+    </div>
+    <div class="field" id="who-ocr-field" style="display:none">
+      <label>Qui a payé ?</label>
+      <div class="segmented mini" id="who-ocr-seg" role="group" aria-label="Qui a payé">
+        <button class="on" data-w="me" type="button">Moi</button>
+        <button data-w="partner" type="button">Toi</button>
+        <button data-w="shared" type="button">À deux</button>
+      </div>
     </div>
     <details class="field">
       <summary style="color:var(--secondary-label);font-size:13px;cursor:pointer">Texte reconnu</summary>
@@ -1031,6 +1085,14 @@
     <label>Catégorie</label>
     <select id="edit-cat" style="width:100%;margin-top:6px;padding:13px 14px;font-size:17px;border:0;border-radius:12px;background:var(--fill);color:var(--label);outline:none"></select>
   </div>
+  <div class="field" id="who-edit-field" style="display:none">
+    <label>Qui a payé ?</label>
+    <div class="segmented mini" id="who-edit-seg" role="group" aria-label="Qui a payé">
+      <button class="on" data-w="me" type="button">Moi</button>
+      <button data-w="partner" type="button">Toi</button>
+      <button data-w="shared" type="button">À deux</button>
+    </div>
+  </div>
   <div class="field">
     <label>Date</label>
     <input id="edit-date" aria-label="Date" type="date" style="width:100%;margin-top:6px;padding:13px 14px;font-size:17px;border:0;border-radius:12px;background:var(--fill);color:var(--label);outline:none">
@@ -1080,6 +1142,33 @@
   <button class="btn-ghost" onclick="closeDeviceSheet()" style="color:var(--secondary-label)">OK</button>
 </div>
 
+<div class="sheet" id="couple-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2 id="couple-sheet-title">Échange du couple</h2>
+  <div id="couple-preview" style="margin:10px 0 4px"></div>
+  <button class="btn-primary" onclick="applyCoupleMerge()">📥 Fusionner les dépenses du partenaire</button>
+  <button class="btn-ghost" onclick="closeCoupleSheet()" style="color:var(--secondary-label)">Annuler</button>
+</div>
+
+<div class="sheet" id="pair-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2>Synchroniser en direct</h2>
+  <p class="hint" style="margin:6px 0 10px">Les deux téléphones sur le même Wi-Fi. Les données circulent directement d'un téléphone à l'autre (WebRTC), sans serveur — le contenu ne quitte jamais le couple.</p>
+  <div id="pair-choice">
+    <button class="btn-primary" style="margin-top:2px" onclick="pairOffer()">➕ Je montre mon code</button>
+    <button class="btn-ghost" style="color:var(--label)" onclick="pairScan()">📷 Je scanne son code</button>
+  </div>
+  <div id="pair-stage" style="display:none">
+    <img id="pair-qr" alt="Code de connexion" style="width:100%;max-width:260px;display:block;margin:4px auto;border-radius:14px">
+    <video id="pair-video" playsinline muted style="width:100%;max-width:260px;border-radius:14px;display:none;margin:4px auto"></video>
+    <p class="hint" id="pair-status" style="margin-top:4px"></p>
+    <textarea id="pair-paste" placeholder="Ou colle ici le code de l'autre téléphone" style="display:none;width:100%;margin-top:8px;padding:10px;border:0;border-radius:12px;background:var(--fill);font-family:monospace;font-size:11px;color:var(--label);outline:none;height:64px" aria-label="Code de connexion collé"></textarea>
+    <button class="btn-primary" id="pair-scan-answer" style="display:none" onclick="pairScanAnswer()">📷 Scanner la réponse</button>
+    <button class="btn-primary" id="pair-use-paste" style="display:none" onclick="pairUsePaste()">Continuer avec ce code</button>
+    <button class="btn-ghost" onclick="pairClose()" style="color:var(--secondary-label)">Fermer</button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1114,6 +1203,9 @@ function stateInit(raw){
   if (!state.recurring) { state.recurring = []; }
   if (!state.goals) { state.goals = []; }
   if (!state.user) { state.user = { name:"" }; }
+  if (!state.couple) state.couple = { on:false, partner:"", sentIds:[], lastAt:"" };
+  if (!Array.isArray(state.couple.sentIds)) state.couple.sentIds = [];
+  if (typeof state.couple.on !== "boolean") state.couple.on = false;
   // Migration : les profils existants (données présentes) sautent l'onboarding
   if (state.onboarded === undefined) { state.onboarded = !!(raw && state.expenses.length); }
   if (raw && state.expenses.length) { processRecurring(); }   // pas de seed ici : l'onboarding décide
@@ -1675,6 +1767,47 @@ const I18N_EN = {
   "Aucune dépense récurrente":"No recurring expenses",
   "＋ Nouvelle dépense":"＋ New expense",
   /* --- divers --- */
+  /* --- Budget couple --- */
+  "Couple":"Couple",
+  "Budget couple":"Couple budget",
+  "Budget couple activé":"Couple budget on",
+  "Budget couple désactivé":"Couple budget off",
+  "Prénom du partenaire":"Partner's first name",
+  "Fichier d'échange pour le partenaire":"Exchange file for your partner",
+  "Importer le fichier du partenaire":"Import your partner's file",
+  "Partage des dépenses par échange de fichier":"Share expenses through file exchange",
+  "Deux téléphones, un budget — chaque téléphone exporte son fichier d'échange, l'autre l'importe. 100% local.":"Two phones, one budget — each phone exports its exchange file, the other imports it. 100% local.",
+  "Moi":"Me",
+  "Toi":"You",
+  "À deux":"Both of us",
+  "Qui a payé ?":"Who paid?",
+  "jamais":"never",
+  "⚖️ À égalité":"⚖️ Dead even",
+  "Ce fichier n'est pas un fichier d'échange couple":"This file isn't a couple exchange file",
+  "Rien de nouveau — à jour":"Nothing new — up to date",
+  "Échange du couple":"Couple exchange",
+  "Fusionner les dépenses du partenaire":"Merge partner's expenses",
+  "📤 Fichier d'échange prêt":"📤 Exchange file ready",
+  /* --- Synchro P2P --- */
+  "Synchroniser en direct":"Sync in real time",
+  "Synchroniser maintenant (Wi-Fi)":"Sync now (Wi-Fi)",
+  "Je montre mon code":"I show my code",
+  "Je scanne son code":"I scan their code",
+  "Scanner la réponse":"Scan the answer",
+  "Continuer avec ce code":"Continue with this code",
+  "Préparation du code…":"Preparing code…",
+  "L'autre téléphone scanne ce code (Réglages → Budget couple → 📷)":"The other phone scans this code (Settings → Couple budget → 📷)",
+  "Fais scanner ce code par l'autre téléphone":"Have the other phone scan this code",
+  "Caméra en cours…":"Starting camera…",
+  "Caméra indisponible — colle le code dans le champ":"Camera unavailable — paste the code in the field",
+  "Code invalide":"Invalid code",
+  "Code trop long — utilise le fichier d'échange 📤":"Code too long — use the exchange file 📤",
+  "Code réponse trop long — utilise le fichier d'échange 📤":"Answer code too long — use the exchange file 📤",
+  "Connexion… synchronisation":"Connecting… syncing",
+  "Connecté — échange des dépenses…":"Connected — exchanging expenses…",
+  "Connexion perdue — réessaie ou utilise le fichier 📤":"Connection lost — retry or use the file 📤",
+  "✓ Synchro faite — à jour":"✓ Sync done — up to date",
+  "Historique trop gros 📤 — utilise le fichier d'échange":"History too big 📤 — use the exchange file",
   "Moyenne":"Average",
   "Total":"Total",
   "Transactions":"Transactions",
@@ -1685,6 +1818,14 @@ const I18N_EN = {
   "Aucune dépense pour le moment.":"No expenses yet.",
   "Tape ＋ pour en ajouter une.":"Tap ＋ to add one.",
   "· atteint !":"· reached!",
+  "Activer le budget couple":"Enable couple budget",
+  "Les deux téléphones sur le même Wi-Fi. Les données circulent directement d'un téléphone à l'autre (WebRTC), sans serveur — le contenu ne quitte jamais le couple.":"Both phones on the same Wi-Fi. Data flows directly from phone to phone (WebRTC), no server — content never leaves the couple.",
+  "➕ Je montre mon code":"➕ Show my code",
+  "📷 Je scanne son code":"📷 Scan their code",
+  "📷 Scanner la réponse":"📷 Scan the answer",
+  "Ou colle ici le code de l'autre téléphone":"Or paste the other phone's code here",
+  "Qui a payé":"Who paid",
+  "Impossible de charger les outils QR — vérifie ta connexion":"Couldn't load QR tools — check your connection",
   "📷 Photo du reçu":"📷 Scan a receipt",
   "Photo de reçu":"Receipt photo",
   "Fermer":"Close",
@@ -1731,7 +1872,14 @@ const I18N_EN_T = {
   "Import du relevé · {n} opérations":"Statement import · {n} transactions",
   "Importer {n} dépense(s) ?\nToutes les données actuelles seront remplacées.":"Import {n} expense(s)?\nAll current data will be replaced.",
   "👋 Bienvenue, {a} !":"👋 Welcome, {a}!",
-  "chaque {a}":"every {a}",
+    "chaque {a}":"every {a}",
+  "échangé le {a}":"exchanged on {a}",
+  "doit {a} à {b}":"owes {a} to {b}",
+  "Échange de {a}":"Exchange from {a}",
+  "📥 {n} dépense(s) de {a} ajoutée(s)":"📥 {n} expense(s) from {a} added",
+  "✓ Synchro faite — {n} dépense(s) ajoutée(s)":"✓ Sync done — {n} expense(s) added",
+  "📤 Fichier d'échange partagé — enregistre-le dans Fichiers":"📤 Exchange file shared — save it to Files",
+  "📤 Fichier d'échange prêt — envoie-le à {a}":"📤 Exchange file ready — send it to {a}",
   "le {a} de chaque mois":"on day {a} of every month",
   "Sauvegarde du {d} · ":"Backup from {d} · ",
   "Devise du fichier : {a} (cette devise ici : {b})":"File currency: {a} (current currency here: {b})",
@@ -1997,6 +2145,7 @@ function renderHome(){
   }
 
   backupReminder();
+  renderCoupleCard();
   drawDonut("donut","legend",monthSpendByCat());
   renderEnvelopes();
   renderGoals();
@@ -2045,7 +2194,7 @@ function renderList(elId, items, compact){
       r.setAttribute("role","button"); r.tabIndex=0;
       r.setAttribute("aria-label", tt("Dépense : {a}, {b}", {a: e.name, b: money(e.amount)}));
       r.innerHTML=`<div class="icon-badge" style="background:${c.color}22">${esc(c.emoji)}</div>
-        <div class="txt"><div class="n">${esc(e.name)}</div><div class="d">${esc(c.label)} · ${dayName(e.date)}</div></div>
+        <div class="txt"><div class="n">${esc(e.name)}</div><div class="d">${esc(c.label)} · ${dayName(e.date)}${whoShort(e) ? ` · ${esc(whoShort(e))}` : ""}</div></div>
         <div class="amt">-${money(e.amount)}</div>`;
       r.onclick=()=>openEdit(e.id);
       g.appendChild(r);
@@ -2060,7 +2209,7 @@ function renderList(elId, items, compact){
         const c=catOf(e.cat);
         html += `<div class="rowitem" data-id="${e.id}" role="button" tabindex="0" aria-label="${esc(tt("Dépense : {a}, {b}", {a: e.name, b: money(e.amount)}))}">
           <div class="icon-badge" style="background:${c.color}22">${esc(c.emoji)}</div>
-          <div class="txt"><div class="n">${esc(e.name)}</div><div class="d">${esc(c.label)}</div></div>
+          <div class="txt"><div class="n">${esc(e.name)}</div><div class="d">${esc(c.label)}${whoShort(e) ? ` · ${esc(whoShort(e))}` : ""}</div></div>
           <div class="amt">-${money(e.amount)}</div></div>`;
       });
       html += `</div>`;
@@ -2135,6 +2284,8 @@ function renderCatGrid(){
 function openSheet(){
   document.getElementById("sheet-cur").textContent = state.currency;
   selectedChipCat = null;
+  pickedWho = "me";
+  renderWhoSeg();
   renderQuickChips();
   renderCatGrid();
   document.getElementById("in-amount").value = "";
@@ -2153,7 +2304,8 @@ function saveExpense(){
   const n = document.getElementById("in-name").value.trim();
   if (!a || a<=0){ toast("Entre un montant valide"); return; }
   state.expenses.push({ id: crypto.randomUUID(), name: n || catOf(pickedCat).label, cat: pickedCat,
-    amount: a, date: todayISO() });
+    amount: a, date: todayISO(),
+    ...(couple().on ? { who: pickedWho } : {}) });
   save(); closeSheet(); render();
   toast("✓ Dépense ajoutée");
 }
@@ -2171,6 +2323,8 @@ function closeEditSheet(){ document.getElementById("edit-sheet").classList.remov
 function openEdit(id){
   const e = state.expenses.find(x=>x.id===id); if(!e) return;
   editId = id;
+  editWho = e.who || "me";
+  renderWhoSeg();
   document.getElementById("edit-cur").textContent = state.currency;
   document.getElementById("edit-amount").value = +e.amount.toFixed(2);
   document.getElementById("edit-name").value = e.name;
@@ -2190,6 +2344,7 @@ function saveEdit(){
   e.amount = a;
   e.name = document.getElementById("edit-name").value.trim() || catOf(cat).label;
   e.cat = cat;
+  if (couple().on) e.who = editWho;
   if (/^\d{4}-\d{2}-\d{2}$/.test(date)) e.date = date;
   save(); clearSheetOverlay(); closeEditSheet(); render();
   toast("✓ Modifiée");
@@ -2213,7 +2368,7 @@ function clearSheetOverlay(){
   document.getElementById("overlay").classList.remove("show"); syncScrollLock();
 }
 function closeAllSheets(){
-  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet(); closeLangSheet(); closeBackupSheet(); closeDeviceSheet(); closeEveningSheet(); closeOcrSheet();
+  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet(); closeLangSheet(); closeBackupSheet(); closeDeviceSheet(); closeEveningSheet(); closeOcrSheet(); closeCoupleSheet(); pairClose();
   closeOpenSwipe();
   clearSheetOverlay();
 }
@@ -2802,6 +2957,7 @@ function buildBackup(s){
   return {
     v: SCHEMA_VERSION,
     rev: +s.rev || 0,   // ⚠️ conservé : sans lui, la copie IndexedDB de l'appareil (rev plus haute) écraserait le fichier restauré au prochain boot
+    deviceId: (typeof s.deviceId === "string" && SAFE_UUID.test(s.deviceId)) ? s.deviceId : undefined,
     budget: +s.budget || 0,
     currency: s.currency || "€",
     onboarded: true,
@@ -2810,7 +2966,13 @@ function buildBackup(s){
     recurring: Array.isArray(s.recurring) ? s.recurring.filter(r=>r && r.amount>0).map(r=>({ name:String(r.name).slice(0,80), cat: knownCat(r.cat) || "other", amount:+r.amount, freq:(r.freq||"m"), wd:+r.wd||0, day:Math.min(Math.max(+r.day||1,1),28), lastAdded: SAFE_DATE.test(r.lastAdded||"") ? r.lastAdded : "" })) : [],
     goals: Array.isArray(s.goals) ? s.goals.filter(g=>g && g.target>0).map(g=>({ id:safeId(g.id), name:String(g.name||"Objectif").slice(0,60), target:+g.target, saved:Math.max(0,+g.saved||0)})) : [],
     user: { name: String((s.user && s.user.name) || "").slice(0,20) },
-    expenses: s.expenses.filter(e=>e && e.amount>0 && SAFE_DATE.test(e.date)).map(e=>({ id:safeId(e.id), name:String(e.name||"").slice(0,60), cat: knownCat(e.cat) || "other", amount:+e.amount, date:e.date}))
+    couple: (s.couple && typeof s.couple === "object") ? {
+      on: !!s.couple.on,
+      partner: String(s.couple.partner || "").slice(0,20),
+      sentIds: Array.isArray(s.couple.sentIds) ? s.couple.sentIds.filter(x=>SAFE_UUID.test(x)).slice(0,2000) : [],
+      lastAt: SAFE_DATE.test(s.couple.lastAt || "") ? s.couple.lastAt : ""
+    } : null,
+    expenses: s.expenses.filter(e=>e && e.amount>0 && SAFE_DATE.test(e.date)).map(e=>({ id:safeId(e.id), name:String(e.name||"").slice(0,60), cat: knownCat(e.cat) || "other", amount:+e.amount, date:e.date, who: (e.who==="partner" || e.who==="shared") ? e.who : "me"}))
   };
 }
 let backupPending = null;
@@ -2845,6 +3007,477 @@ function openBackupSheet(bk){
     </div>`;
   document.getElementById("overlay").classList.add("show"); syncScrollLock();
   document.getElementById("backup-sheet").classList.add("show"); syncScrollLock();
+}
+/* ============ Budget couple ============ */
+/* Deux téléphones, un budget. Chaque appareil exporte/échange son delta
+   (dépenses que l'autre n'a pas encore, identifiées par liste d'ids `sentIds`),
+   l'autre fusionne en remappant les attributions moi⇄toi. Un `deviceId`
+   stable identifie l'appareil : pas d'ambiguïté sur les prénoms. */
+function couple(){
+  if (!state.couple) state.couple = { on:false, partner:"", sentIds:[], lastAt:"" };
+  if (!Array.isArray(state.couple.sentIds)) state.couple.sentIds = [];
+  if (typeof state.couple.on !== "boolean") state.couple.on = false;
+  if (!state.couple.deviceId){
+    try { state.couple.deviceId = crypto.randomUUID(); } catch(_){ state.couple.deviceId = "d" + Date.now(); }
+    save();
+  }
+  return state.couple;
+}
+function partnerName(){
+  return (couple().partner || "").trim() || (LANG==="en" ? "Partner" : "Toi");
+}
+function myName(){
+  return (state.user && state.user.name || "").trim() || (LANG==="en" ? "Me" : "Moi");
+}
+/* Attribution affichée relative à CET appareil : "me"/"partner"/"shared" */
+function whoShort(e){
+  if (e.who === "partner") return partnerName();
+  if (e.who === "shared") return t("À deux");
+  return "";
+}
+/* Remappage à l'import : le fichier vient-de l'autre appareil (sauf si c'est
+   un second appareil de MAITRE même personne — deviceId identique). */
+function remapWho(w, fromIsMe){
+  if (fromIsMe || !w) return w || "me";
+  return w === "me" ? "partner" : (w === "partner" ? "me" : w);
+}
+/* Delta à envoyer : dépenses jamais vues par l'autre (ids absents de sentIds)
+   + petits blocs complets (cats/budgets/goals/recurring — fusion idempotente). */
+function buildCoupleExport(st){
+  st = st || state;
+  const c = st.couple || {};
+  const sent = new Set(c.sentIds || []);
+  const expenses = st.expenses.filter(e=>!sent.has(e.id)).map(e=>({
+    id:e.id, name:String(e.name||"").slice(0,60), cat:e.cat, amount:+e.amount,
+    date:e.date, who:(e.who==="partner"||e.who==="shared") ? e.who : "me"
+  }));
+  return { app:"sika-couple", schema:SCHEMA_VERSION, exportedAt: todayISO(),
+    from: c.deviceId || "",
+    name: ((st.user && st.user.name) || "").trim() || (LANG==="en" ? "Me" : "Moi"),
+    expenses,
+    cats: JSON.parse(JSON.stringify(st.cats||{})),
+    budgets: JSON.parse(JSON.stringify(st.budgets||{})),
+    budget: +st.budget || 0,
+    goals: JSON.parse(JSON.stringify(st.goals||[])),
+    recurring: JSON.parse(JSON.stringify(st.recurring||[])) };
+}
+/* Fusion du fichier/partage reçu dans un état donné — pure, pour les tests.
+   fromIsMe=true quand le fichier provient d'un autre appareil de la même
+   personne (second téléphone) : pas de swap moi⇄toi. */
+function coupleMergeInto(st, bk, fromIsMe){
+  const key = e => e.date + "|" + String(e.name).trim().toLowerCase() + "|" + Math.round(+e.amount*100);
+  if (!fromIsMe && bk.peerName && st.couple && !st.couple.partner && st.couple !== undefined) st.couple.partner = bk.peerName;
+  const byId = new Set(st.expenses.map(e=>e.id));
+  const have = new Set(st.expenses.map(key));
+  const sent = new Set((st.couple && st.couple.sentIds) || []);   // ids dont l'autre a déjà connaissance
+  let added = 0, skipped = 0;
+  bk.expenses.forEach(e=>{
+    const merged = { ...e, who: remapWho(e.who, fromIsMe) };
+    if (byId.has(e.id) || have.has(key(merged))){ skipped++; sent.add(e.id); return; }
+    st.expenses.push(merged); byId.add(e.id); have.add(key(merged)); sent.add(e.id); added++;
+  });
+  Object.entries(bk.cats || {}).forEach(([k,c])=>{ if (!st.cats[k]) st.cats[k] = c; });
+  Object.entries(bk.budgets || {}).forEach(([k,v])=>{ if (st.budgets[k] === undefined && st.cats[k]) st.budgets[k] = +v; });
+  (bk.goals || []).forEach(g=>{
+    const mine = (st.goals || []).find(x=>x.id === g.id);
+    if (!mine) st.goals.push(g);
+    else if (g.saved > mine.saved) mine.saved = g.saved;
+  });
+  (bk.recurring || []).forEach(r=>{
+    const mine = (st.recurring || []).find(x=>x.name===r.name && x.cat===r.cat && x.freq===(r.freq||"m") && Math.abs(x.amount-r.amount)<0.005);
+    if (!mine) st.recurring.push(r);
+    else if (r.lastAdded && r.lastAdded > (mine.lastAdded||"")) mine.lastAdded = r.lastAdded;
+  });
+  if (!st.budget && bk.budget) st.budget = bk.budget;
+  if (!st.couple || typeof st.couple !== "object") st.couple = { on:false, partner:"", sentIds:[], lastAt:"" };
+  if (!Array.isArray(st.couple.sentIds)) st.couple.sentIds = [];
+  st.couple.sentIds = [...sent];
+  st.couple.lastAt = todayISO();
+  // le fichier d'un vrai partenaire (autre deviceId) active le couple et adopte son prénom
+  if (!fromIsMe){
+    if (bk.peerName && !st.couple.partner) st.couple.partner = bk.peerName;
+    st.couple.on = true;
+  }
+  return { added, skipped };
+}
+/* Validation de l'objet entrant : réutilise la whitelist des sauvegardes */
+function buildCoupleImport(data){
+  if (!data || data.app !== "sika-couple" || !Array.isArray(data.expenses)) return null;
+  const bk = buildBackup(data);
+  if (!bk) return null;
+  bk.app = "sika-couple";
+  bk.from = SAFE_UUID.test(String(data.from||"")) ? data.from : crypto.randomUUID();
+  bk.peerName = String(data.name || "").slice(0, 20);
+  return bk;
+}
+function coupleMonthly(){
+  const month = todayISO().slice(0, 7);
+  const sum = { me: 0, partner: 0, shared: 0 };
+  state.expenses.filter(e=>e.date.startsWith(month)).forEach(e=>{ sum[e.who || "me"] += e.amount; });
+  return sum;
+}
+function renderCoupleCard(){
+  const card = document.getElementById("couple-summary");
+  if (!couple().on){ card.style.display = "none"; return; }
+  const sum = coupleMonthly();
+  const total = sum.me + sum.partner + sum.shared;
+  const my = myName(), p = partnerName();
+  document.getElementById("couple-title").textContent = t("Couple") + " · " + my + " & " + p;
+  let lines = "";
+  if (!total){
+    lines = '<div class="empty" style="padding:10px 0">' + t("Aucune dépense pour le moment.") + "</div>";
+  } else {
+    lines =
+      `<div class="cmp-row"><span class="cmp-lbl">${esc(my)}</span><span class="cmp-nums">${money(sum.me + sum.shared/2)}</span></div>` +
+      `<div class="cmp-row"><span class="cmp-lbl">${esc(p)}</span><span class="cmp-nums">${money(sum.partner + sum.shared/2)}</span></div>`;
+    const solde = sum.me - sum.partner;   // ce que j'ai avancé en trop (part commune incluse)
+    if (Math.abs(solde) < 0.005) lines += `<div class="cmp-row"><span class="cmp-lbl">${t("⚖️ À égalité")}</span></div>`;
+    else if (solde > 0) lines += `<div class="cmp-row"><span class="cmp-lbl">⚠️ ${esc(p)} ${tt("doit {a} à {b}", {a: money(solde/2), b: esc(my)})}</span></div>`;
+    else lines += `<div class="cmp-row"><span class="cmp-lbl">⚠️ ${esc(my)} ${tt("doit {a} à {b}", {a: money(-solde/2), b: esc(p)})}</span></div>`;
+  }
+  document.getElementById("couple-split").innerHTML = lines;
+  card.style.display = "block";
+}
+function renderCoupleSettings(){
+  const c = couple();
+  document.getElementById("couple-on").checked = !!c.on;
+  ["couple-partner-row","couple-export-row","couple-import-row","couple-pair-row"].forEach(id=>{
+    document.getElementById(id).style.display = c.on ? "flex" : "none";
+  });
+  document.getElementById("partner-name-input").value = c.partner || "";
+  document.getElementById("couple-last").textContent =
+    c.lastAt ? tt("échangé le {a}", {a: c.lastAt}) : t("jamais");
+}
+/* --- UI : export du fichier d'échange, import-fusion, fiche d'aperçu --- */
+let pendingCouple = null;
+async function exportCouple(){
+  const c = couple(); if (!c.on) return;
+  const payload = buildCoupleExport();
+  const me = myName().toLowerCase().replace(/[^a-z0-9]/g, "") || "moi";
+  const data = JSON.stringify(payload, null, 2);
+  const how = await shareOrDownload(data, "application/json", `sika-couple-${me}-${todayISO()}.json`, "📤 Fichier d'échange prêt");
+  if (how === "cancelled") return;
+  const sent = new Set(c.sentIds || []);
+  payload.expenses.forEach(e=>sent.add(e.id));
+  c.sentIds = [...sent];
+  c.lastAt = todayISO();
+  save(); render();
+}
+function couplePick(){ document.getElementById("couple-file").click(); }
+function importCoupleFile(file){
+  if (!file) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    let bk = null;
+    try { bk = buildCoupleImport(JSON.parse(fr.result)); }
+    catch (_){ bk = null; }
+    if (!bk){ toast(t("Ce fichier n'est pas un fichier d'échange couple")); return; }
+    openCoupleSheet(bk);
+  };
+  fr.readAsText(file);
+}
+function openCoupleSheet(bk){
+  pendingCouple = bk;
+  const fromIsMe = couple().deviceId === bk.from;
+  const pName = fromIsMe ? myName() : (bk.peerName || partnerName());
+  document.getElementById("couple-sheet-title").textContent = tt("Échange de {a}", {a: pName});
+  const key = e => e.date + "|" + String(e.name).trim().toLowerCase() + "|" + Math.round(+e.amount*100);
+  const have = new Set(state.expenses.map(key));
+  const byIds = new Set(state.expenses.map(e=>e.id));
+  const dups = bk.expenses.filter(e=>byIds.has(e.id) || have.has(key(e))).length;
+  document.getElementById("couple-preview").innerHTML =
+    `<div class="empty" style="padding:4px 0 6px">
+      📂 ${tt("{n} dépense(s)", {n: bk.expenses.length})} · ${(bk.goals||[]).length} ${t("objectif(s)")} · ${(bk.recurring||[]).length} ${t("récurrence(s)")}
+      <br><b>${dups ? tt("{n} doublon(s) ignoré(s) à la fusion", {n: dups}) : t("Aucun doublon à la fusion")}</b>
+    </div>`;
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("couple-sheet").classList.add("show"); syncScrollLock();
+}
+function applyCoupleMerge(){
+  const bk = pendingCouple; if (!bk) return;
+  const fromIsMe = couple().deviceId === bk.from;
+  if (!fromIsMe && bk.peerName && !couple().partner) couple().partner = bk.peerName;
+  if (!couple().on) couple().on = true;   // un fichier d'échange reçu vaut activation
+  const res = coupleMergeInto(state, bk, fromIsMe);
+  pendingCouple = null;
+  closeCoupleSheet(); save(); render();
+  toast(res.added
+    ? tt("📥 {n} dépense(s) de {a} ajoutée(s)", {n: res.added, a: partnerName()})
+    : t("Rien de nouveau — à jour"));
+}
+function closeCoupleSheet(){
+  document.getElementById("couple-sheet").classList.remove("show");
+  clearSheetOverlay();
+  pendingCouple = null;
+}
+/* --- Synchro P2P (WebRTC + QR) ---
+   Même Wi-Fi, zéro serveur : le SDP compressé passe par un QR (déflatre-raw +
+   base64url, préfixe SK1). Le remplacement des candidates host/mDNS requiert
+   le même réseau local ; sinon, le fichier d'échange reste le recours. */
+let __pair = null;   // { pc, dc, role, stream }
+const PAIR_PREFIX = "SK1:";
+function pairStatus(msg){
+  const el = document.getElementById("pair-status");
+  el.textContent = msg; el.style.display = msg ? "block" : "none";
+}
+/* libs QR lazy-loadées avant toute fiche qui les affiche ou scanne */
+async function pairLibsOrNotify(){
+  try { await pairLibs(); return true; }
+  catch (_) { pairStatus(t(QR_NET_MSG)); return false; }
+}
+function openPairSheet(){
+  document.getElementById("pair-choice").style.display = "";
+  document.getElementById("pair-stage").style.display = "none";
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("pair-sheet").classList.add("show"); syncScrollLock();
+}
+function pairClose(){
+  if (__pair){ try { __pair.pc && __pair.pc.close(); } catch(_){} stopPairScan(); __pair = null; }
+  document.getElementById("pair-sheet").classList.remove("show");
+  clearSheetOverlay();
+  pairStatus("");
+}
+/* --- compression du code (deflate-raw → base64url ; SK1:) --- */
+async function pairEncode(obj){
+  const raw = JSON.stringify(obj);
+  let body = raw;
+  try { if (window.CompressionStream){
+    const resp = new Response(new Blob([raw]).stream().pipeThrough(new CompressionStream("deflate-raw")));
+    body = bufToB64url(new Uint8Array(await resp.arrayBuffer()));
+  } } catch(_){ /* sans compression : le SDP brut tient souvent quand même */ }
+  return PAIR_PREFIX + body;
+}
+async function pairDecode(text){
+  text = String(text || "").trim();
+  if (!text.startsWith(PAIR_PREFIX)) return null;
+  let body = text.slice(PAIR_PREFIX.length);
+  try {
+    const buf = b64urlToBuf(body);
+    const resp = new Response(new Blob([buf]).stream().pipeThrough(new DecompressionStream("deflate-raw")));
+    return JSON.parse(await resp.text());
+  } catch (_){}
+  try { return JSON.parse(body.replace(/^deflate:/, "")); }   // repli non-compressé
+  catch (e){ return null; }
+}
+/* --- WebRTC --- */
+function pairPeer(){
+  const pc = new RTCPeerConnection({ iceServers: [] });   // host-only : même Wi-Fi, rien ne quitte le réseau local
+  return pc;
+}
+function waitIce(pc){
+  return new Promise(res=>{
+    if (pc.iceGatheringState === "complete") return res();
+    const to = setTimeout(res, 2500);   // on prend ce qu'on a : host candidates suffisants
+    pc.addEventListener("icegatheringstatechange", ()=>{
+      if (pc.iceGatheringState === "complete"){ clearTimeout(to); res(); }
+    });
+  });
+}
+function pairShowQr(text){
+  try {
+    const qr = qrcode(0, "L"); qr.addData(text, "Byte"); qr.make();
+    const img = document.getElementById("pair-qr");
+    img.src = qr.createDataURL(Math.max(2, Math.floor(260 / (qr.getModuleCount() + 8))), 4);
+    img.style.display = "block";
+    document.getElementById("pair-video").style.display = "none";
+    return true;
+  } catch (err){ return false; }
+}
+async function pairOffer(){
+  if (!await pairLibsOrNotify()) return;
+  pairStatus(t("Préparation du code…"));
+  try { await pairLibs(); } catch(_){ pairStatus(t(QR_NET_MSG)); return; }
+  document.getElementById("pair-choice").style.display = "none";
+  document.getElementById("pair-stage").style.display = "block";
+  document.getElementById("pair-qr").style.display = "";
+  document.getElementById("pair-video").style.display = "none";
+  const pc = pairPeer();
+  const dc = pc.createDataChannel("sika");
+  hookDataChannel(dc);
+  await pc.setLocalDescription(await pc.createOffer());
+  await waitIce(pc);
+  const code = await pairEncode({ t:"offer", sdp: pc.localDescription.sdp });
+  if (!pairShowQr(code)){ pairStatus(t("Code trop long — utilise le fichier d'échange 📤")); return; }
+  pairStatus(t("L'autre téléphone scanne ce code (Réglages → Budget couple → 📷)"));
+  __pair = { pc, dc, role:"offer", offerCode: code };   // code récupérable sans scanner (tests, repli)
+  // repli clipboard pour QR illisible
+  const ta = document.getElementById("pair-paste");
+  ta.style.display = "block";
+  ta.value = "";
+  document.getElementById("pair-use-paste").style.display = "block";
+  document.getElementById("pair-scan-answer").style.display = "block";
+}
+async function pairAcceptOffer(code){
+  if (!await pairLibsOrNotify()) return false;
+  const msg = await pairDecode(code);
+  if (!msg || msg.t !== "offer"){ toast(t("Code invalide")); return false; }
+  if (__pair){ try { __pair.pc && __pair.pc.close(); } catch(_){} stopPairScan(); }
+  const pc = pairPeer();
+  await pc.setRemoteDescription({ type:"offer", sdp: msg.sdp });
+  await pc.setLocalDescription(await pc.createAnswer());
+  await waitIce(pc);
+  __pair = { pc, dc:null, role:"answer" };
+  pc.ondatachannel = e => hookDataChannel(e.channel);
+  const code2 = await pairEncode({ t:"answer", sdp: pc.localDescription.sdp });
+  __pair.answerCode = code2;
+  if (!pairShowQr(code2)){ pairStatus(t("Code réponse trop long — utilise le fichier d'échange 📤")); return false; }
+  pairStatus(t("Fais scanner ce code par l'autre téléphone"));
+  document.getElementById("pair-paste").value = code2;
+  return true;
+}
+async function pairUsePaste(){
+  const ta = document.getElementById("pair-paste");
+  const code = (ta.value || "").trim();
+  if (!code) return;
+  if (__pair && __pair.scanning) stopPairScan();
+  if (__pair && __pair.role === "offer"){
+    const msg = await pairDecode(code);
+    if (!msg || msg.t !== "answer"){ toast(t("Code invalide")); return; }
+    try { await __pair.pc.setRemoteDescription({ type:"answer", sdp: msg.sdp }); }
+    catch(err){ toast(t("Code invalide")); return; }
+    ta.value = ""; ta.style.display = "none";
+    return;
+  }
+  await pairAcceptOffer(code);
+}
+async function pairScanAnswer(){ stopPairScan(); __pair.scanning = true; pairScanLoop(); }
+/* --- scanner QR (jsQR sur le flux caméra) --- */
+function stopPairScan(){
+  if (__pair && __pair.stream){ __pair.stream.getTracks().forEach(t=>t.stop()); __pair.stream = null; }
+  __pair && (__pair.scanning = false);
+}
+async function pairScan(){
+  if (!await pairLibsOrNotify()) return;
+  document.getElementById("pair-choice").style.display = "none";
+  document.getElementById("pair-stage").style.display = "block";
+  pairStatus(t("Caméra en cours…"));
+  try { await pairLibs(); } catch(_){ pairStatus(t(QR_NET_MSG)); return; }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:"environment", width:{ideal:1280} } });
+  } catch(err){ pairStatus(t("Caméra indisponible — colle le code dans le champ"));; 
+    document.getElementById("pair-paste").style.display = "block";
+    document.getElementById("pair-use-paste").style.display = "block";
+    return; }
+  if (!__pair) __pair = { pc:null, dc:null, role:"scan", stream };
+  __pair.stream = stream;
+  const video = document.getElementById("pair-video");
+  video.srcObject = stream; video.style.display = "block";
+  document.getElementById("pair-qr").style.display = "none";
+  await video.play().catch(()=>{});
+  __pair.scanning = true;
+  pairScanLoop();
+}
+function pairScanLoop(){
+  if (!__pair || !__pair.scanning || !__pair.stream) return;
+  const video = document.getElementById("pair-video");
+  if (video.readyState >= 2){
+    const c = document.createElement("canvas");
+    const w = Math.min(video.videoWidth || 640, 480), h = Math.round(w * (video.videoHeight / (video.videoWidth || 640)));
+    c.width = w; c.height = h;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(video, 0, 0, w, h);
+    const im = ctx.getImageData(0, 0, w, h);
+    const found = window.jsQR && jsQR(im.data, im.width, im.height, { inversionAttempts: "dontInvert" });
+    if (found && found.data){
+      __pair.scanning = false;
+      stopPairScan();
+      pairOnScan(found.data);
+    }
+  }
+  setTimeout(pairScanLoop, 180);
+}
+async function pairOnScan(data){
+  if (__pair && __pair.role === "offer"){
+    // initiateur : on attend la réponse de l'autre téléphone
+    const msg = await pairDecode(data);
+    if (!msg || msg.t !== "answer"){ __pair.scanning = true; pairScanLoop(); return; }
+    try { await __pair.pc.setRemoteDescription({ type:"answer", sdp: msg.sdp }); }
+    catch(err){ pairStatus(t("Code invalide")); __pair.scanning = true; pairScanLoop(); return; }
+    document.getElementById("pair-video").style.display = "none";
+    pairStatus(t("Connexion… synchronisation"));
+    return;
+  }
+  // accepteur : on vient de scanner l'offre → on fabrique la réponse
+  const ok = await pairAcceptOffer(data);
+  if (!ok) pairStatus(t("Code invalide"));
+}
+/* --- canal de données : échange des delta couples, comme un fichier --- */
+function hookDataChannel(dc){
+  if (!__pair) __pair = { pc:null, role:"handoff" };
+  __pair.dc = dc;
+  dc.onopen = () => {
+    pairStatus(t("Connecté — échange des dépenses…"));
+    const payload = JSON.stringify(buildCoupleExport());
+    if (payload.length > 150000){   // au-delà, le canal sature : le fichier reste le recours
+      pairStatus(t("Historique trop gros 📤 — utilise le fichier d'échange"));
+      return;
+    }
+    dc.send(payload);
+  };
+  dc.onmessage = ev => pairOnPayload(String(ev.data));
+  dc.onerror = () => pairStatus(t("Connexion perdue — réessaie ou utilise le fichier 📤"));
+}
+function pairOnPayload(text){
+  let bk = null;
+  try { bk = buildCoupleImport(JSON.parse(text)); } catch(_){ bk = null; }
+  if (!bk){ toast(t("Code invalide")); return; }
+  const fromIsMe = couple().deviceId === bk.from;
+  if (!fromIsMe && bk.peerName && !couple().partner) couple().partner = bk.peerName;
+  if (!couple().on) couple().on = true;
+  const res = coupleMergeInto(state, bk, fromIsMe);
+  couple().lastAt = todayISO();
+  save(); render();
+  pairStatus(res.added
+    ? tt("✓ Synchro faite — {n} dépense(s) ajoutée(s)", { n: res.added })
+    : t("✓ Synchro faite — à jour"));
+  toast(res.added ? tt("📥 {n} dépense(s) de {a} ajoutée(s)", { n: res.added, a: partnerName() }) : t("Rien de nouveau — à jour"));
+}
+/* --- lazy-load des libs QR (vendored, ~150 Ko) : offre/réponse et scan --- */
+const QR_URL = "./vendor/qr/";
+function pairLibs(){
+  const need = [];
+  if (typeof window.qrcode !== "function") need.push("qrcode.min.js");
+  if (typeof window.jsQR !== "function") need.push("jsQR.min.js");
+  if (!need.length) return Promise.resolve();
+  if (window.__pairLibP) return window.__pairLibP;
+  window.__pairLibP = Promise.all(need.map(n => new Promise((res, rej)=>{
+    const s = document.createElement("script");
+    s.src = QR_URL + n;
+    s.onload = ()=>res(); s.onerror = ()=>rej(new Error("lib QR manquante"));
+    document.head.appendChild(s);
+  }))).catch(err => { window.__pairLibP = null; throw err; });
+  return window.__pairLibP;
+}
+const QR_NET_MSG = "Impossible de charger les outils QR — vérifie ta connexion";
+
+/* --- base64url --- */
+function bufToB64url(buf){
+  let bin = ""; buf.forEach(b=>bin += String.fromCharCode(b));
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64urlToBuf(s){
+  s = s.replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  const bin = atob(s); const buf = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) buf[i] = bin.charCodeAt(i);
+  return buf;
+}
+
+/* --- Choix "Qui a payé ?" (3 fiches de saisie) --- */
+let pickedWho = "me", editWho = "me", ocrWho = "me";
+function renderWhoSeg(){
+  if (!state || !state.couple) return;
+  const on = !!couple().on;
+  ["who-field","who-edit-field","who-ocr-field"].forEach(id=>{
+    const f = document.getElementById(id); if (f) f.style.display = on ? "block" : "none";
+  });
+  const pb = document.getElementById("who-partner-btn");
+  if (pb) pb.textContent = partnerName();
+  [["who-seg", pickedWho], ["who-edit-seg", editWho], ["who-ocr-seg", ocrWho]].forEach(([id, cur])=>{
+    const seg = document.getElementById(id); if (!seg) return;
+    seg.querySelectorAll("button").forEach(b=>b.classList.toggle("on", b.dataset.w === cur));
+  });
 }
 /* ====== Vue du soir : résumé du jour + rappels (alternative 100% locale aux push) ====== */
 function showEveningView(){
@@ -2921,6 +3554,15 @@ function applyBackupMerge(){
   });
   if (!state.budget && bk.budget) state.budget = bk.budget;
   if (!state.user.name && bk.user.name) state.user.name = bk.user.name;
+  if (bk.couple){
+    if (!state.couple || typeof state.couple !== "object") state.couple = { on:false, partner:"", sentIds:[], lastAt:"" };
+    if (!Array.isArray(state.couple.sentIds)) state.couple.sentIds = [];
+    if (bk.couple.partner && !state.couple.partner) state.couple.partner = bk.couple.partner;
+    if (bk.couple.on && !state.couple.on) state.couple.on = true;
+    const sent = new Set(state.couple.sentIds || []);
+    (bk.couple.sentIds||[]).forEach(x=>sent.add(x));
+    state.couple.sentIds = [...sent];
+  }
   state.lastBackupAt = ymd(new Date());
   closeBackupSheet();
   save(); renderHistFilter(); switchTab("home"); render();
@@ -3162,6 +3804,7 @@ function render(){
     renderCats();
     renderBudgets();
     renderRecurring();
+    renderCoupleSettings();
   }
 }
 
@@ -3206,6 +3849,33 @@ document.getElementById("csv-file").addEventListener("change", e=>{
   const fr = new FileReader();
   fr.onload = () => openCsvSheet(parseCsv(fr.result));
   fr.readAsText(f);
+});
+/* --- Budget couple --- */
+document.getElementById("couple-on").addEventListener("change", e=>{
+  couple();
+  state.couple.on = e.target.checked;
+  state.couple.lastAt = e.target.checked ? state.couple.lastAt : "";
+  save(); render();
+  toast(e.target.checked ? "💑 " + t("Budget couple activé") : t("Budget couple désactivé"));
+});
+document.getElementById("partner-name-input").addEventListener("change", e=>{
+  couple();
+  state.couple.partner = e.target.value.trim().slice(0, 20);
+  save(); render(); renderWhoSeg();
+});
+document.getElementById("couple-file").addEventListener("change", e=>{
+  const f = e.target.files && e.target.files[0];
+  e.target.value = "";
+  importCoupleFile(f);
+});
+["who-seg","who-edit-seg","who-ocr-seg"].forEach(id=>{
+  document.getElementById(id).addEventListener("click", e=>{
+    const b = e.target.closest("button"); if (!b) return;
+    if (id === "who-seg") pickedWho = b.dataset.w;
+    else if (id === "who-edit-seg") editWho = b.dataset.w;
+    else ocrWho = b.dataset.w;
+    document.querySelectorAll("#" + id + " button").forEach(x=>x.classList.toggle("on", x.dataset.w === b.dataset.w));
+  });
 });
 
 // Accessibilité : les "pseudo-boutons" (role=button) réagissent à Enter et Espace
@@ -3277,6 +3947,8 @@ enableSwipeClose(document.getElementById("ocr-sheet"), ()=>{ closeOcrSheet(); sy
 enableSwipeClose(document.getElementById("device-sheet"), closeDeviceSheet);
 enableSwipeClose(document.getElementById("evening-sheet"), closeEveningSheet);
 enableSwipeClose(document.getElementById("edit-cat-sheet"), closeEditCatSheet);
+enableSwipeClose(document.getElementById("couple-sheet"), closeCoupleSheet);
+enableSwipeClose(document.getElementById("pair-sheet"), pairClose);
 document.getElementById("cat-edit-name").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); saveEditCat(); } });
 
 // ---- Pavé numérique (écrans tactiles) ----
@@ -3534,6 +4206,7 @@ async function ocrRun(file){
     document.getElementById("ocr-name").value = ex.merchant;
     document.getElementById("ocr-raw").textContent = text.slice(0, 4000);
     fillOcrCats(text);
+    ocrWho = "me"; renderWhoSeg();
     document.getElementById("ocr-fields").style.display = "block";
     document.getElementById("ocr-go").style.display = "block";
     document.getElementById("ocr-bar-wrap").style.display = "none";
@@ -3558,7 +4231,8 @@ function saveOcrExpense(){
   const n = document.getElementById("ocr-name").value.trim();
   const cat = document.getElementById("ocr-cat").value;
   state.expenses.push({ id: crypto.randomUUID(), name: n || catOf(cat).label, cat,
-    amount: a, date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayISO() });
+    amount: a, date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayISO(),
+    ...(couple().on ? { who: ocrWho } : {}) });
   save(); closeOcrSheet(); render();
   toast("✓ Dépense ajoutée");
 }

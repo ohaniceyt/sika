@@ -164,10 +164,84 @@ eq(nextOccur({freq:"w", wd:0}, "2026-10-05"), "2026-10-12", "nextOccur hebdo +7 
   eq(st2.expenses.length, today.slice(8) < "01" ? 1 : 0, "création en cours de mois avec jour passé : pas d'ajout rétroactif");
 }
 
+/* ======== Budget couple ======== */
+const TODAY = "2026-10-10";
+const ST = {};
+const useST = obj => {
+  Object.keys(ST).forEach(k => delete ST[k]);
+  Object.keys(obj).forEach(k => {
+    const v = obj[k];
+    ST[k] = (Array.isArray(v)) ? v.map(x=>JSON.parse(JSON.stringify(x)))
+         : (v && typeof v === "object") ? JSON.parse(JSON.stringify(v)) : v;
+  });
+  return ST;
+};
+const coupleFns = new Function("SCHEMA_VERSION", "CATS", "state", "todayISO",
+  grab("/* ====== Restauration : aperçu + fusion dédoublonnée ou remplacement ====== */", "let backupPending") +
+  grab("/* ============ Budget couple ============ */", "/* ====== Vue du soir") +
+  "const LANG = \"fr\"; return { couple, remapWho, buildCoupleExport, coupleMergeInto, buildCoupleImport };"
+)(3, { other:{label:"Autre",emoji:"\ud83d\udce6",color:"#8e8e93"}, food:{label:"Alimentation",emoji:"\ud83c\udf54",color:"#ff9500"} }, ST, () => TODAY);
+const { remapWho, buildCoupleExport, coupleMergeInto, buildCoupleImport } = coupleFns;
+
+const emptyCouple = () => ({ on:true, partner:"", sentIds:[], lastAt:"", deviceId:"11111111-1111-4111-8111-111111111111" });
+const stA = () => ({ budget: 100,
+  expenses: [
+    { id:"aaaaaaaa-1111-4111-8111-000000000001", name:"Café", cat:"food", amount:2.5, date:"2026-10-09", who:"me" },
+    { id:"aaaaaaaa-1111-4111-8111-000000000002", name:"Courses", cat:"food", amount:40, date:"2026-10-10", who:"shared" }
+  ],
+  cats: { food:{label:"Alimentation",emoji:"\ud83c\udf54",color:"#ff9500"} }, budgets:{}, goals:[], recurring:[] });
+const stB = () => ({ budget: 0,
+  expenses: [ { id:"bbbbbbbb-2222-4222-8222-000000000001", name:"Taxi", cat:"transport", amount:12, date:"2026-10-09", who:"me" } ],
+  cats:{}, budgets:{}, goals:[], recurring:[] });
+
+// remappage moi⇄toi selon la provenance
+eq(remapWho("me", false), "partner", "remapWho : moi → toi");
+eq(remapWho("partner", false), "me", "remapWho : toi → moi");
+eq(remapWho("shared", false), "shared", "remapWho : à deux inchangé");
+eq(remapWho("me", true), "me", "remapWho : même deviceId → inchangé");
+
+// A exporte son delta, B le fusionne
+{
+  const A = stA(); A.couple = emptyCouple();
+  useST(A);
+  const payload = buildCoupleExport();
+  const bk = buildCoupleImport(JSON.parse(JSON.stringify({ ...payload, from: A.couple.deviceId, name: "Ama" })));
+  check(bk && bk.app === "sika-couple" && bk.expenses.length === 2, "couple : export → import complet");
+  const B = stB(); B.couple = { on:false, partner:"", sentIds:[], lastAt:"", deviceId:"22222222-2222-4222-8222-222222222222" };
+  const r1 = coupleMergeInto(B, bk, false);
+  eq(r1.added, 2, "couple : fusion B reçoit les 2 dépenses de A");
+  eq(B.expenses.find(e=>e.name==="Courses").who, "shared", "couple : à deux inchangé chez B");
+  check(B.couple.on && B.couple.partner === "Ama", "couple : activation + prénom adoptés");
+  check(B.couple.sentIds.includes("aaaaaaaa-1111-4111-8111-000000000001"), "couple : ids reçus marqués envoyés");
+  // B répond : son delta n'inclut PAS les dépenses reçues (déjà connues de A)
+  useST(B);
+  const payloadB = buildCoupleExport();
+  eq(payloadB.expenses.map(e=>e.name), ["Taxi"], "couple : la réponse de B ne renvoie pas les dépenses de A");
+  const bkB = buildCoupleImport({ app:"sika-couple", expenses: payloadB.expenses, cats: payloadB.cats, budgets: payloadB.budgets,
+    budget: payloadB.budget, goals: payloadB.goals, recurring: payloadB.recurring, from: B.couple.deviceId, name: "Koami" });
+  const r2 = coupleMergeInto(A, bkB, false);
+  eq(r2.added, 1, "couple : fusion A reçoit le delta de B");
+  eq(A.expenses.find(e=>e.name==="Taxi").who, "partner", "couple : taxi de B = partner chez A");
+  // idempotence : refusion du même fichier → 0 ajouté
+  const r3 = coupleMergeInto(A, bkB, false);
+  eq(r3.added, 0, "couple : refusion = 0 ajout (dédup id + date|nom|montant)");
+  // second appareil de la même personne : pas de swap
+  const A2 = stB(); A2.couple = { on:true, partner:"", sentIds:[], lastAt:"", deviceId:"11111111-1111-4111-8111-111111111111" };
+  coupleMergeInto(A2, bkB, true);
+  eq(A2.expenses[0].who, "me", "couple : même deviceId → attribution inchangée");
+  // fichier malveillant sur le couple
+  const evil = buildCoupleImport({ app:"sika-couple", from:"11111111-1111-4111-8111-111111111111", name:"<x>",
+    expenses:[{ id:"x'); alert(1); ('", name:"<b>", cat:"food", amount:1, date:"2026-10-01", who:"me" }] });
+  check(evil && UUIDRE.test(evil.expenses[0].id), "couple : id malveillant reconstruit dans le canal couple");
+  check(buildCoupleImport({ app:"autre", expenses:[] }) === null, "couple : app inconnue rejetée");
+  check(buildCoupleImport({ app:"sika-couple", expenses:"pas-un-tableau" }) === null, "couple : expenses non-tableau rejeté");
+}
+
 /* ======== esc ======== */
 eq(esc("<img src=x onerror=alert(1)>"), "&lt;img src=x onerror=alert(1)&gt;", "esc : balise");
 eq(esc('"a\'&'), "&quot;a&#39;&amp;", "esc : guillemets + &");
 eq(esc(null), "", "esc : null → chaîne vide");
+
 
 console.log(`\n${passed} tests OK, ${failed} échec(s)`);
 process.exit(failed ? 1 : 0);
