@@ -11,12 +11,12 @@
 - **Enveloppes budgétaires** par catégorie (barres colorées, dépassement signalé)
 - **Saisie ultra-rapide** : chips des dépenses fréquentes + pavé numérique maison sur mobile (pas de clavier système)
 - **Modifier/supprimer** : tap sur une dépense → fiche complète (avec **« Même dépense aujourd'hui »** en 1 tap) ; sur une catégorie, glisse à droite = modifier, à gauche = supprimer avec **réaffectation au choix** des dépenses et récurrences
-- **Récurrences** mensuelles ou **hebdomadaires**, ajoutées automatiquement — moteur sans doublon, même en ouvrant l'app une fois par mois ; **tap sur une récurrence pour la modifier** (montant, catégorie, fréquence, jour) ou l'arrêter
+- **Récurrences** mensuelles ou **hebdomadaires**, ajoutées automatiquement — 1ʳᵉ occurrence toujours future (pas d'ajout rétroactif à la création), moteur sans doublon, même en ouvrant l'app une fois par mois ; **tap sur une récurrence pour la modifier** (montant, catégorie, fréquence, jour) ou l'arrêter
 - **Objectifs d'épargne** avec progression et suppression
 - **Stats** : périodes mois / semaine / année (sélecteur), donut % ⇄ montant, comparatif vs mois ou semaine précédente, tendance 6 mois, série de saisie, objectifs atteints
 - **Historique** : groupé par jour, recherche, filtres, pagination (200 par 200)
-- **Multi-appareils sans serveur** : guide « Passer sur un autre appareil » (Réglages → Données) — transfert par le fichier JSON par Mail/AirDrop/WhatsApp, restauration avec aperçu et choix **Fusionner** (dédoublonnage date+libellé+montant, union des catégories, progression d'objectif au max, récurrences dédupliquées) ou Remplacer
-- **Données** : export CSV, sauvegarde/restauration JSON complète, **import de relevé bancaire CSV** avec détection du séparateur/format de date/`1 234,56`⇄`1,234.56` et **catégorisation automatique**, rappel de sauvegarde **+ bandeau mensuel** (archivage du mois précédent dans les 7 premiers jours)
+- **Multi-appareils sans serveur** : guide « Passer sur un autre appareil » (Réglages → Données) — transfert par le fichier JSON par Mail/AirDrop/WhatsApp, restauration avec aperçu et choix **Fusionner** (dédoublonnage date+libellé+montant, union des catégories, progression d'objectif au max, récurrences dédupliquées) ou Remplacer — tout fichier importé est **validé strictement** avant insertion (ids reconstruits, catégories/emoji/couleurs/budgets whitelistés)
+- **Données** : export CSV, sauvegarde/restauration JSON complète, **import de relevé bancaire CSV** avec détection du séparateur/format de date/`1 234,56`⇄`1,234.56` et **catégorisation automatique** — les crédits (virements reçus) sont ignorés : colonne Crédit jamais retenue, montants positifs déposés dans un relevé signé —, rappel de sauvegarde **+ bandeau mensuel** (archivage du mois précédent dans les 7 premiers jours)
 - **OCR de reçu (v2.0)** : bouton **📷 Photo du reçu** dans « Nouvelle dépense » → photo prise sur place (caméra), reconnaissance **100% locale** (Tesseract wasm vendu dans `vendor/tesseract/`, chargé à la première utilisation puis mis en cache) → montant, date et marchand proposés, **tout modifiable** dans la fiche de confirmation avant l'ajout
 - **Vue du soir** : à l'ouverture entre 18h et 5h, résumé du jour (dépenses, plus grosse dépense, solde mensuel) + rappels — une fois par soir, alternative 100% locale aux notifications push (impossibles sans serveur sur iOS)
 - **Hors ligne** : service worker, tout marche sans réseau
@@ -24,7 +24,7 @@
 ## Technique
 HTML/CSS/JS vanilla dans un seul `index.html` (~100 Ko), **zéro dépendance**, zéro serveur. Schéma de données versionné (v3), stockage « double copie » : `localStorage` (arbitré par un compteur `rev` monotone) + **IndexedDB** durable — supporte bien plus de 20 000 dépenses même quand le quota localStorage (~5 Mo chez Safari) sature, avec reprise auto de la copie la plus récente. Backup manuel encadré par un rappel automatique + bandeau mensuel, focus-trap et `role="button"` sur les listes (clavier).
 
-**OCR** : tesseract.js 7 + modèles `best_int` (fra, ~0,7 Mo) vendus dans `vendor/tesseract/` (~12 Mo, **hors cache d'install** du service worker — téléchargés à la 1ʳᵉ photo puis gardés en cache runtime/IndexedDB par le worker Tesseract). Extraction montant/date/marchand heuristique (lignes TOTAL, MONTANT, devise, centimes), batterie de tests dédiée. Fonctionne hors ligne après la 1ʳᵉ utilisation.
+**OCR** : tesseract.js 7 + modèles `best_int` (fra, ~0,7 Mo) vendus dans `vendor/tesseract/` (~12 Mo, **hors cache d'install** du service worker — téléchargés à la 1ʳᵉ photo puis gardés en cache runtime/IndexedDB par le worker Tesseract). Extraction montant/date/marchand heuristique (lignes TOTAL, MONTANT, devise, centimes), batterie de tests versionnée (`node tests/run-tests.mjs`). Fonctionne hors ligne après la 1ʳᵉ utilisation.
 
 Icônes : source vectorielle unique `icons/icon.svg` (~0,9 Ko) → PNG compressés palette (~10–12 Ko) + **écrans de démarrage iOS** light/dark (une taille exacte par appareil, `apple-touch-startup-image`). Régénérables en 1 commande : `node scripts/gen-ios-assets.mjs` (script dev, nécessite `npm i sharp`, pas déployé).
 
@@ -38,6 +38,7 @@ Design : [Apple Human Interface Guidelines](https://developer.apple.com/design/h
 - `sw.js` — service worker (network-first sur les navigations, offline-first)
 - `icons/` — icônes (SVG source vecteur + PNG 180/192/512) et `icons/splash/` — écrans de démarrage iOS
 - `scripts/gen-ios-assets.mjs` — générateur dev des PNG (script, pas déployé)
+- `tests/run-tests.mjs` — batterie de tests Node (~65 tests : parseurs montants/CSV, validation des sauvegardes, extraction OCR, récurrences) — extrait les fonctions pures de `index.html`, zéro dépendance : `node tests/run-tests.mjs`
 
 ## Licence
 MIT.
