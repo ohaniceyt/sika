@@ -707,6 +707,11 @@
       <div class="v">.json</div>
     </div>
     <input type="file" id="import-file" accept=".json,application/json" style="display:none">
+    <div class="setrow" onclick="openDeviceSheet()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(90,200,250,.15)">📱</div>
+      <div class="n">Passer sur un autre appareil</div>
+      <div class="v">guide</div>
+    </div>
     <div class="setrow" onclick="installPWA()" role="button" tabindex="0" style="cursor:pointer;display:none" id="install-row">
       <div class="icon-badge" style="background:rgba(90,200,250,.18)">📲</div>
       <div class="n">Installer l'application</div>
@@ -714,7 +719,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.23 bêta</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.24 alpha</div></div>
   </div>
 </div>
 
@@ -999,6 +1004,28 @@
     <button class="btn-primary" onclick="confirmCsvImport()">Importer les dépenses</button>
     <button class="btn-ghost" onclick="closeCsvSheet()" style="color:var(--secondary-label)">Annuler</button>
   </div>
+</div>
+
+<div class="sheet" id="backup-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2 id="backup-title">Restaurer une sauvegarde</h2>
+  <div id="backup-preview" style="margin:10px 0 4px"></div>
+  <button class="btn-primary" onclick="applyBackupMerge()">🔄 Fusionner (ajoute, sans doublon)</button>
+  <button class="btn-ghost" onclick="applyBackupReplace()" style="color:var(--red)">Remplacer tout</button>
+  <button class="btn-ghost" onclick="closeBackupSheet()" style="color:var(--secondary-label)">Annuler</button>
+  <p class="hint">Fusionner : ajoute les dépenses absentes de cet appareil (id + libellé + montant + date identiques = ignorées) et complète catégories et objectifs. Remplacer : efface tout ici et restaure tel quel.</p>
+</div>
+
+<div class="sheet" id="device-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2>Passer sur un autre appareil</h2>
+  <p class="hint" style="margin:6px 0 10px">Sika ne transmet rien du tout : tu passes par un fichier. La ligne rouge du 100% local reste intacte.</p>
+  <div class="group">
+    <div class="setrow"><div class="icon-badge" style="background:rgba(0,122,255,.15)">1</div><div class="n">Ici : Réglages → Sauvegarde complète (JSON)</div></div>
+    <div class="setrow"><div class="icon-badge" style="background:rgba(52,199,89,.15)">2</div><div class="n">Envoie le fichier par Mail, AirDrop ou WhatsApp</div></div>
+    <div class="setrow"><div class="icon-badge" style="background:rgba(255,149,0,.15)">3</div><div class="n">Sur le nouvel appareil : Restaurer une sauvegarde → choisis fusionner</div></div>
+  </div>
+  <button class="btn-ghost" onclick="closeDeviceSheet()" style="color:var(--secondary-label)">OK</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1498,6 +1525,16 @@ const I18N_EN = {
   "Importer les dépenses":"Import expenses",
   "Catégories devinées automatiquement — modifiables après en tapant une dépense.":"Categories guessed automatically — editable afterwards by tapping an expense.",
   "Rien de nouveau à importer":"Nothing new to import",
+  "Passer sur un autre appareil":"Move to another device",
+  "guide":"guide",
+  "OK":"OK",
+  "Aucun doublon à la fusion":"No duplicates on merge",
+  "Ici : Réglages → Sauvegarde complète (JSON)":"Here: Settings → Full backup (JSON)",
+  "Envoie le fichier par Mail, AirDrop ou WhatsApp":"Send the file by Mail, AirDrop or WhatsApp",
+  "Sur le nouvel appareil : Restaurer une sauvegarde → choisis fusionner":"On the new device: Restore a backup → choose merge",
+  "Sika ne transmet rien du tout : tu passes par un fichier. La ligne rouge du 100% local reste intacte.":"Sika sends nothing at all: you go through a file. The 100% local red line stays intact.",
+  "objectif(s)":"goal(s)",
+  "récurrence(s)":"recurring expense(s)",
   "Aucune opération reconnaissable dans ce fichier":"No recognizable transactions in this file",
   "Import impossible : fichier invalide":"Import failed: invalid file",
   "Dépense importée":"Imported expense",
@@ -1582,6 +1619,12 @@ const I18N_EN_T = {
   "👋 Bienvenue, {a} !":"👋 Welcome, {a}!",
   "chaque {a}":"every {a}",
   "le {a} de chaque mois":"on day {a} of every month",
+  "Sauvegarde du {d} · ":"Backup from {d} · ",
+  "Devise du fichier : {a} (cette devise ici : {b})":"File currency: {a} (current currency here: {b})",
+  "{n} doublon(s) ignoré(s) à la fusion":"{n} duplicate(s) skipped on merge",
+  "Fichier de {a} — nom adopté":"File from {a} — name adopted",
+  "📥 {n} dépense(s) ajoutée(s) par fusion":"📥 {n} expense(s) added by merge",
+  "Remplacer TOUTES les données de cet appareil par le fichier ({n} dépense(s)) ?":"Replace ALL data on this device with the file ({n} expense(s))?",
   "Modifier la récurrence {a}":"Edit recurring expense {a}",
   "{n} dépense(s)":"{n} expense(s)",
   "{n} récurrence(s)":"{n} recurring expense(s)",
@@ -2036,7 +2079,7 @@ function clearSheetOverlay(){
   document.getElementById("overlay").classList.remove("show"); syncScrollLock();
 }
 function closeAllSheets(){
-  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet(); closeLangSheet();
+  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet(); closeLangSheet(); closeBackupSheet(); closeDeviceSheet();
   closeOpenSwipe();
   clearSheetOverlay();
 }
@@ -2579,39 +2622,103 @@ async function exportBackup(){
   if (how === "shared") return;   // toast déjà envoyé par le partage
   toast("💾 Sauvegarde exportée");
 }
+/* ====== Restauration : aperçu + fusion dédoublonnée ou remplacement ====== */
+function buildBackup(s){
+  if (!s || !Array.isArray(s.expenses)) throw new Error("format");
+  const catsSrc = s.cats && !Array.isArray(s.cats) ? s.cats : {};
+  const knownCat = k => Object.prototype.hasOwnProperty.call(catsSrc, k) ? k : null;
+  return {
+    v: SCHEMA_VERSION,
+    budget: +s.budget || 0,
+    currency: s.currency || "€",
+    onboarded: true,
+    cats: (typeof s.cats === "object" && s.cats && Object.keys(s.cats).length) ? s.cats : JSON.parse(JSON.stringify(CATS)),
+    budgets: (s.budgets && typeof s.budgets === "object") ? s.budgets : {},
+    recurring: Array.isArray(s.recurring) ? s.recurring.filter(r=>r && r.cat && r.amount>0).map(r=>({ name:String(r.name).slice(0,80), cat:r.cat, amount:+r.amount, freq:(r.freq||"m"), wd:+r.wd||0, day:Math.min(Math.max(+r.day||1,1),28), lastAdded:r.lastAdded||"" })) : [],
+    goals: Array.isArray(s.goals) ? s.goals.filter(g=>g && g.target>0).map(g=>({ id:g.id||crypto.randomUUID(), name:String(g.name||"Objectif").slice(0,60), target:+g.target, saved:Math.max(0,+g.saved||0)})) : [],
+    user: { name: String((s.user && s.user.name) || "").slice(0,20) },
+    expenses: s.expenses.filter(e=>e && e.cat && e.amount>0 && /^\d{4}-\d{2}-\d{2}$/.test(e.date)).map(e=>({ id:e.id||crypto.randomUUID(), name:String(e.name||"").slice(0,60), cat: knownCat(e.cat) || "other", amount:+e.amount, date:e.date}))
+  };
+}
+let backupPending = null;
 function importBackup(file){
   if (!file) return;
   const fr = new FileReader();
   fr.onload = () => {
     try {
       const data = JSON.parse(fr.result);
-      const s = (data && data.state) ? data.state : data;
-      if (!s || !Array.isArray(s.expenses)) throw new Error("format");
-      if (!confirm(tt("Importer {n} dépense(s) ?\nToutes les données actuelles seront remplacées.", {n: s.expenses.length}))) return;
-      // toute catégorie inconnue (import tiers) est remappée vers "other"
-      const catsSrc = (Array.isArray(s.cats) ? null : s.cats) || {};
-      const knownCat = k => Object.prototype.hasOwnProperty.call(catsSrc, k) ? k : null;
-      const fresh = {
-        v: SCHEMA_VERSION,
-        budget: +s.budget || 0,
-        currency: s.currency || "€",
-        onboarded: true,
-        cats: typeof s.cats === "object" && s.cats && Object.keys(s.cats).length ? s.cats : JSON.parse(JSON.stringify(CATS)),
-        budgets: (s.budgets && typeof s.budgets === "object") ? s.budgets : {},
-        recurring: Array.isArray(s.recurring) ? s.recurring.filter(r=>r && r.cat && r.amount>0).map(r=>({ name:String(r.name).slice(0,80), cat:r.cat, amount:+r.amount, day:Math.min(Math.max(+r.day||1,1),28), lastAdded:r.lastAdded||"", })) : [],
-        goals: Array.isArray(s.goals) ? s.goals.filter(g=>g && g.target>0).map(g=>({ id:g.id||crypto.randomUUID(), name:String(g.name||"Objectif").slice(0,60), target:+g.target, saved:Math.max(0,+g.saved||0)})) : [],
-        user: { name: String((s.user && s.user.name) || "").slice(0,20) },
-        expenses: s.expenses.filter(e=>e && e.cat && e.amount>0 && /^\d{4}-\d{2}-\d{2}$/.test(e.date)).map(e=>({ id:e.id||crypto.randomUUID(), name:String(e.name||"").slice(0,60), cat: knownCat(e.cat) || "other", amount:+e.amount, date:e.date}))
-      };
-      state = fresh; save();
-      save(); renderHistFilter(); switchTab("home"); render();
-      toast(`📥 ${fresh.expenses.length} dépense(s) importée(s)`);
+      const bk = buildBackup((data && data.state) ? data.state : data);
+      bk.exportedAt = data && data.exportedAt ? String(data.exportedAt).slice(0,10) : "";
+      openBackupSheet(bk);
     } catch (err) {
       toast("Import impossible : fichier invalide");
       console.warn("Sika import:", err);
     }
   };
   fr.readAsText(file);
+}
+function openBackupSheet(bk){
+  backupPending = bk;
+  const sameDay = new Set(state.expenses.map(e=>e.date + "|" + String(e.name).trim().toLowerCase() + "|" + Math.round(+e.amount*100)));
+  const dups = bk.expenses.filter(e=> sameDay.has(e.date + "|" + String(e.name).trim().toLowerCase() + "|" + Math.round(+e.amount*100))).length;
+  const cur = state.user && state.user.name ? state.user.name : null;
+  document.getElementById("backup-title").textContent = t("Restaurer une sauvegarde");
+  document.getElementById("backup-preview").innerHTML =
+    `<div class="empty" style="padding:4px 0 6px">
+      📂 ${bk.exportedAt ? tt("Sauvegarde du {d} · ", {d: bk.exportedAt}) : ""}${tt("{n} dépense(s)", {n: bk.expenses.length})} · ${(bk.goals||[]).length} ${t("objectif(s)")} · ${(bk.recurring||[]).length} ${t("récurrence(s)")}
+      ${bk.currency !== state.currency ? "<br>⚠️ " + tt("Devise du fichier : {a} (cette devise ici : {b})", {a: bk.currency, b: state.currency}) : ""}
+      <br><b>${dups ? tt("{n} doublon(s) ignoré(s) à la fusion", {n: dups}) : t("Aucun doublon à la fusion")}</b>
+      ${cur ? "" : "<br>" + tt("Fichier de {a} — nom adopté", {a: (bk.user.name||"—")})}
+    </div>`;
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("backup-sheet").classList.add("show"); syncScrollLock();
+}
+function openDeviceSheet(){
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("device-sheet").classList.add("show"); syncScrollLock();
+}
+function closeDeviceSheet(){
+  document.getElementById("device-sheet").classList.remove("show");
+  clearSheetOverlay();
+}
+function closeBackupSheet(){
+  document.getElementById("backup-sheet").classList.remove("show");
+  clearSheetOverlay();
+  backupPending = null;
+}
+function applyBackupMerge(){
+  const bk = backupPending; if (!bk) return;
+  let added = 0;
+  const key = e => e.date + "|" + String(e.name).trim().toLowerCase() + "|" + Math.round(+e.amount*100);
+  const have = new Set(state.expenses.map(key));
+  bk.expenses.forEach(e=>{ const k = key(e); if (!have.has(k)){ state.expenses.push(e); have.add(k); added++; } });
+  Object.entries(bk.cats||{}).forEach(([k,c])=>{ if (!state.cats[k]) state.cats[k] = c; });
+  Object.entries(bk.budgets||{}).forEach(([k,v])=>{ if (state.budgets[k] === undefined && state.cats[k]) state.budgets[k] = +v; });
+  (bk.goals||[]).forEach(g=>{
+    const mine = (state.goals||[]).find(x=>x.id === g.id);
+    if (!mine) state.goals.push(g);
+    else if (g.saved > mine.saved) mine.saved = g.saved;   // progression cumulée max
+  });
+  (bk.recurring||[]).forEach(r=>{
+    const mine = (state.recurring||[]).find(x=>x.name===r.name && x.cat===r.cat && x.freq===(r.freq||"m") && Math.abs(x.amount-r.amount)<0.005);
+    if (!mine) state.recurring.push(r);
+    else if (r.lastAdded && r.lastAdded > (mine.lastAdded||"")) mine.lastAdded = r.lastAdded;
+  });
+  if (!state.budget && bk.budget) state.budget = bk.budget;
+  if (!state.user.name && bk.user.name) state.user.name = bk.user.name;
+  state.lastBackupAt = ymd(new Date());
+  closeBackupSheet();
+  save(); renderHistFilter(); switchTab("home"); render();
+  toast(tt("📥 {n} dépense(s) ajoutée(s) par fusion", {n: added}));
+}
+function applyBackupReplace(){
+  const bk = backupPending; if (!bk) return;
+  if (!confirm(tt("Remplacer TOUTES les données de cet appareil par le fichier ({n} dépense(s)) ?", {n: bk.expenses.length}))) return;
+  state = bk;
+  state.lastBackupAt = ymd(new Date());
+  closeBackupSheet();
+  save(); renderHistFilter(); switchTab("home"); render();
+  toast(tt("📥 {n} dépense(s) importée(s)", {n: bk.expenses.length}));
 }
 function installPWA(){
   if (!deferredPrompt){ toast("iPhone : Partager → « Sur l'écran d'accueil »"); return; }
@@ -2942,6 +3049,8 @@ enableSwipeClose(document.getElementById("lang-sheet"), ()=>{ closeLangSheet(); 
 enableSwipeClose(document.getElementById("goal-sheet"), ()=>{ closeSheet(); closeGoalSheets(); });
 enableSwipeClose(document.getElementById("goal-contrib-sheet"), ()=>{ closeSheet(); closeGoalSheets(); });
 enableSwipeClose(document.getElementById("edit-sheet"), ()=>{ closeEditSheet(); clearSheetOverlay(); syncScrollLock(); });
+enableSwipeClose(document.getElementById("backup-sheet"), closeBackupSheet);
+enableSwipeClose(document.getElementById("device-sheet"), closeDeviceSheet);
 enableSwipeClose(document.getElementById("edit-cat-sheet"), closeEditCatSheet);
 document.getElementById("cat-edit-name").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); saveEditCat(); } });
 

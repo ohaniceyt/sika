@@ -15,6 +15,7 @@
 - **Objectifs d'épargne** avec progression et suppression
 - **Stats** : périodes mois / semaine / année (sélecteur), donut % ⇄ montant, comparatif vs mois ou semaine précédente, tendance 6 mois, série de saisie, objectifs atteints
 - **Historique** : groupé par jour, recherche, filtres, pagination (200 par 200)
+- **Multi-appareils sans serveur** : guide « Passer sur un autre appareil » (Réglages → Données) — transfert par le fichier JSON par Mail/AirDrop/WhatsApp, restauration avec aperçu et choix **Fusionner** (dédoublonnage date+libellé+montant, union des catégories, progression d'objectif au max, récurrences dédupliquées) ou Remplacer
 - **Données** : export CSV, sauvegarde/restauration JSON complète, **import de relevé bancaire CSV** avec détection du séparateur/format de date/`1 234,56`⇄`1,234.56` et **catégorisation automatique**, rappel de sauvegarde **+ bandeau mensuel** (archivage du mois précédent dans les 7 premiers jours)
 - **Hors ligne** : service worker, tout marche sans réseau
 
