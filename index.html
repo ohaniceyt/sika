@@ -629,6 +629,11 @@
       <div class="n">Revoir la présentation</div>
       <div class="v">onboarding</div>
     </div>
+    <div class="setrow" onclick="openLangSheet()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(90,200,250,.15)">🌐</div>
+      <div class="n" id="lang-row-label">Langue</div>
+      <div class="v" id="lang-current"></div>
+    </div>
   </div>
   <div class="list-header"><span class="t">Budget</span></div>
   <div class="group">
@@ -709,7 +714,7 @@
     </div>
   </div>
   <div class="group" style="margin-top:20px">
-    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.22 bêta</div></div>
+    <div class="setrow"><div class="n" style="text-align:center;color:var(--secondary-label);font-size:13px">Sika v0.23 alpha</div></div>
   </div>
 </div>
 
@@ -902,6 +907,13 @@
   <p class="hint" id="rec-hint">Seront ajoutées automatiquement chaque mois, même en ouvrant l'app une fois par mois.</p>
 </div>
 
+<div class="sheet" id="lang-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2 id="lang-title">Langue</h2>
+  <div class="group" id="lang-opts"></div>
+  <button class="btn-ghost" onclick="closeLangSheet()">Annuler</button>
+</div>
+
 <div class="sheet" id="goal-sheet" role="dialog" aria-modal="true">
   <div class="grabber"></div>
   <h2>Nouvel objectif</h2>
@@ -1019,7 +1031,7 @@ function load() {
   if (!state || typeof state !== "object") { state = { budget: 0, currency: "€", expenses: [] }; }
   if (!Array.isArray(state.expenses)) state.expenses = [];
   if (!state.v || state.v < SCHEMA_VERSION) { state.v = SCHEMA_VERSION; }   // migrations future-proof
-  if (!state.cats) { state.cats = JSON.parse(JSON.stringify(CATS)); }
+  if (!state.cats) { state.cats = catDefaults(); }
   if (!state.budgets) { state.budgets = {}; }
   if (!state.recurring) { state.recurring = []; }
   if (!state.goals) { state.goals = []; }
@@ -1031,6 +1043,19 @@ function load() {
 }
 
 const SPLITS = { food:.30, bills:.25, transport:.10, shopping:.10, fun:.10, health:.05, other:.10 };
+/* Étiquettes des catégories par défaut selon la langue détectée (le FR reste la source) */
+function catDefaults(){
+  if ((navigator.language||"").toLowerCase().startsWith("en")){
+    return { food:{label:"Food",emoji:"🍔",color:"#ff9500"},
+             transport:{label:"Transport",emoji:"🚕",color:"#5ac8fa"},
+             shopping:{label:"Shopping",emoji:"🛍️",color:"#af52de"},
+             bills:{label:"Housing",emoji:"🏠",color:"#5856d6"},
+             fun:{label:"Fun",emoji:"🎬",color:"#ff2d55"},
+             health:{label:"Health",emoji:"💊",color:"#34c759"},
+             other:{label:"Other",emoji:"📦",color:"#8e8e93"} };
+  }
+  return JSON.parse(JSON.stringify(CATS));
+}
 function autoSplitBudget(){
   state.budgets = {};
   Object.keys(state.cats).forEach(k=>{
@@ -1106,14 +1131,14 @@ function renderRecurring(){
     const c = catOf(r.cat);
     const row = document.createElement("div"); row.className = "setrow";
     row.setAttribute("role","button"); row.tabIndex = 0;
-    row.setAttribute("aria-label", `Modifier la récurrence ${r.name}`);
+    row.setAttribute("aria-label", tt("Modifier la récurrence {a}", {a: r.name}));
     row.innerHTML = `<div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
-      <div class="n">${esc(r.name)}<div style="font-size:12px;color:var(--secondary-label)">${money(+r.amount)} · ${r.freq==="w" ? "chaque "+["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"][+r.wd||0] : "le "+r.day+" de chaque mois"}</div></div>`;
+      <div class="n">${esc(r.name)}<div style="font-size:12px;color:var(--secondary-label)">${money(+r.amount)} · ${r.freq==="w" ? tt("chaque {a}", {a: I18N_WD()[+r.wd||0]}) : tt("le {a} de chaque mois", {a: r.day})}</div></div>`;
     row.onclick = ()=>openRecEdit(r);
     row.onkeydown = e => { if (e.key==="Enter" || e.key===" "){ e.preventDefault(); openRecEdit(r); } };
     const del = document.createElement("button"); del.className = "del-btn"; del.textContent = "✕";
     del.setAttribute("aria-label","Supprimer");
-    const delFlow = ()=>{ if (confirm(`Arrêter la récurrence de « ${r.name} » ?`)){
+    const delFlow = ()=>{ if (confirm(tt("Arrêter la récurrence de « {a} » ?", {a: r.name}))){
       const idx = state.recurring.indexOf(r);
       if (idx > -1) state.recurring.splice(idx, 1);
       save(); renderRecurring(); render(); toast("Récurrence arrêtée"); } };
@@ -1211,9 +1236,9 @@ function openCsvSheet(rows){
   if (!rows.length){ toast("Aucune opération reconnaissable dans ce fichier"); return; }
   csvRows = rows;
   const total = rows.reduce((s,r)=>s+r.amount,0);
-  document.getElementById("csv-title").textContent = `Import du relevé · ${rows.length} opérations`;
+  document.getElementById("csv-title").textContent = tt("Import du relevé · {n} opérations", {n: rows.length});
   document.getElementById("csv-preview").innerHTML =
-    `<div class="empty" style="padding:4px 0 10px">Total : <b>${money(total)}</b><br><span style="font-size:12px">Catégories devinées automatiquement — modifiables après en tapant une dépense.</span></div>
+    `<div class="empty" style="padding:4px 0 10px">${t("Total : ")}<b>${money(total)}</b><br><span style="font-size:12px">${t("Catégories devinées automatiquement — modifiables après en tapant une dépense.")}</span></div>
      <div class="csv-wrap">` + rows.map(r=>{
        const c = catOf(r.cat);
        return `<div class="csv-row"><span class="csv-d">${r.date.slice(8)}/${r.date.slice(5,7)}</span>
@@ -1241,14 +1266,352 @@ function confirmCsvImport(){
   });
   csvRows = null;
   save(); closeCsvSheet(); render();
-  toast(added ? `📥 ${added} dépense${added>1?"s":""} importée${added>1?"s":""}` : "Rien de nouveau à importer");
+  toast(added ? tt("📥 {n} dépense(s) importée(s)", {n: added}) : t("Rien de nouveau à importer"));
 }
 
 /* ============ Utilitaires ============ */
 function money(a){
   const dec = state.currency === "FCFA" ? 0 : 2;   // le franc CFA n'a pas de sous-unités
-  return a.toLocaleString('fr-FR',{minimumFractionDigits:dec, maximumFractionDigits:dec}) + " " + state.currency;
+  return a.toLocaleString(LANG==="en" ? "en-GB" : "fr-FR",{minimumFractionDigits:dec, maximumFractionDigits:dec}) + " " + state.currency;
 }
+// Noms de jours/mois et locale de formatage selon la langue active
+const I18N_LOCALE = () => LANG==="en" ? "en-GB" : "fr-FR";
+const I18N_WD = () => LANG==="en"
+  ? ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"]
+  : ["lundi","mardi","mercredi","jeudi","vendredi","samedi","dimanche"];
+/* ================= i18n =================
+   Le FR est la langue source (texte inline) ; l'EN est un dictionnaire.
+   Deux mécanismes :
+   1. t()/tt() pour les chaînes construites en JS ;
+   2. passe automatique (MutationObserver) qui traduit tout nœud texte
+      ou attribut dont le contenu correspond EXACTEMENT au dictionnaire —
+      aucun data-i18n à maintenir dans le markup.
+*/
+const I18N_EN = {
+  /* --- Accueil --- */
+  "Dépensé ce mois":"Spent this month",
+  "💾 Sauvegarde conseillée":"💾 Backup recommended",
+  "Sauvegarder":"Back up",
+  "Plus tard":"Later",
+  "Enveloppes du mois":"Monthly envelopes",
+  "Objectifs d'épargne":"Savings goals",
+  "＋ Objectif":"＋ Goal",
+  "＋ Nouvelle":"＋ New",
+  "Solde mensuel restant":"Monthly balance left",
+  "Aucun budget défini — ajoute-le dans Réglages quand tu veux":"No budget set — add one in Settings whenever you want",
+  /* --- Stats / Historique --- */
+  "Analyse de tes dépenses":"Analysis of your spending",
+  "Semaine":"Week",
+  "Mois":"Month",
+  "Année":"Year",
+  "Par catégorie":"By category",
+  "vs mois précédent":"vs last month",
+  "vs semaine précédente":"vs last week",
+  "Tendance mensuelle":"Monthly trend",
+  "Historique":"History",
+  "tout":"All",
+  "Récentes":"Recent",
+  "Tout voir":"See all",
+  "Moyenne / jour":"Average / day",
+  "Plus grosse dépense":"Biggest expense",
+  "Série de saisie (jours)":"Logging streak (days)",
+  "Objectifs atteints":"Goals reached",
+  "Total du mois":"Total this month",
+  "Total de la semaine":"Total this week",
+  "Total de l'année":"Total this year",
+  "Aujourd'hui":"Today",
+  "Hier":"Yesterday",
+  "nouveau":"new",
+  "Nouvelle dépense":"New expense",
+  "Saisie rapide":"Quick entry",
+  /* --- Sheets --- */
+  "Libellé":"Label",
+  "Catégorie":"Category",
+  "Ajouter la dépense":"Add expense",
+  "Supprimer la catégorie":"Delete category",
+  "Déplacer vers":"Move to",
+  "Catégorie de destination":"Destination category",
+  "Tout réaffecter et supprimer":"Reassign all and delete",
+  "Annuler":"Cancel",
+  "Nouvelle catégorie":"New category",
+  "Nom":"Name",
+  "Icône":"Icon",
+  "Couleur":"Color",
+  "Créer la catégorie":"Create category",
+  "Nouvelle récurrence":"New recurring expense",
+  "Modifier la récurrence":"Edit recurring expense",
+  "Montant (par mois)":"Amount (per month)",
+  "Fréquence":"Frequency",
+  "Mensuelle":"Monthly",
+  "Hebdomadaire":"Weekly",
+  "Jour du mois (1–28)":"Day of month (1–28)",
+  "Jour de la semaine":"Day of week",
+  "Lundi":"Monday","Mardi":"Tuesday","Mercredi":"Wednesday","Jeudi":"Thursday","Vendredi":"Friday","Samedi":"Saturday","Dimanche":"Sunday",
+  "Programmer la récurrence":"Schedule recurring expense",
+  "Enregistrer les changements":"Save changes",
+  "Arrêter la récurrence":"Stop recurring expense",
+  "Seront ajoutées automatiquement chaque mois, même en ouvrant l'app une fois par mois.":"Added automatically every month, even if you open the app once a month.",
+  "Enregistrer":"Save",
+  "Modifier la dépense":"Edit expense",
+  "Date":"Date",
+  "＋ Même dépense aujourd'hui":"＋ Same expense today",
+  "Supprimer la dépense":"Delete expense",
+  "Nouvel objectif":"New goal",
+  "Montant cible":"Target amount",
+  "Créer l'objectif":"Create goal",
+  "Épargner":"Set aside",
+  "Montant à mettre de côté":"Amount to set aside",
+  "Ajouter à l'objectif":"Add to goal",
+  "Retirer de l'objectif":"Withdraw from goal",
+  "Modifier la catégorie":"Edit category",
+  /* --- Réglages --- */
+  "Réglages":"Settings",
+  "Préférences de l'app":"App preferences",
+  "Mon profil":"My profile",
+  "Mon prénom":"My name",
+  "Revoir la présentation":"Replay the intro",
+  "Budget":"Budget",
+  "Budget mensuel":"Monthly budget",
+  "Catégories":"Categories",
+  "Ajouter une catégorie":"Add a category",
+  "Budgets par catégorie":"Category budgets",
+  "Laisse une ligne vide pour n'utiliser que le budget global":"Lines left empty just use the global budget",
+  "Dépenses récurrentes":"Recurring expenses",
+  "Ajouter une récurrence":"Add a recurring expense",
+  "Devise":"Currency",
+  "Monnaie":"Currency",
+  "Euro €":"Euro €",
+  "Dollar $":"Dollar $",
+  "Dollar US":"US dollar",
+  "Dollar CAD":"CAD dollar",
+  "Franc CFA":"CFA franc",
+  "Franc suisse":"Swiss franc",
+  "Livre £":"Pound £",
+  "Franc CHF":"Swiss franc CHF",
+  "Données":"Data",
+  "Effacer toutes les données":"Erase all data",
+  "Exporter en CSV":"Export as CSV",
+  "Sauvegarde complète (JSON)":"Full backup (JSON)",
+  "Importer un relevé CSV":"Import a bank statement (CSV)",
+  "Restaurer une sauvegarde":"Restore a backup",
+  "Installer l'application":"Install the app",
+  "iPhone : Partager → « Sur l'écran d'accueil »":"iPhone: Share → « Add to Home Screen »",
+  "Langue":"Language",
+  "Système":"System",
+  "Français":"Français",
+  "English":"English",
+  /* --- Onboarding --- */
+  "Ton argent, sous contrôle.":"Your money, under control.",
+  "Enveloppes, objectifs, récurrentes — en 2 minutes.":"Envelopes, goals, recurring — in 2 minutes.",
+  "🔒 100% local — tes données restent sur ton téléphone, rien n'est envoyé.":"🔒 100% local — your data stays on your phone, nothing is ever sent.",
+  "Créer mon profil":"Create my profile",
+  "Passer":"Skip",
+  "Tu t'appelles comment ?":"What's your name?",
+  "Sika te salue chaque jour par ton prénom.":"Sika greets you every day by your name.",
+  "Continuer":"Continue",
+  "Ta devise ?":"Your currency?",
+  "Tous tes montants seront affichés dans cette monnaie.":"All your amounts will be shown in this currency.",
+  "Ton budget mensuel":"Your monthly budget",
+  "(optionnel)":"(optional)",
+  "Sika fonctionne très bien sans budget : tu verras juste tes dépenses, sans objectif. Tu pourras l'ajouter plus tard dans Réglages.":"Sika works just fine without a budget: you'll simply see your expenses, without targets. You can add one later in Settings.",
+  "Continuer sans budget":"Continue without a budget",
+  "Répartition conseillée ?":"Suggested split?",
+  "Sika peut découper ton budget en enveloppes par catégorie :":"Sika can split your budget into category envelopes:",
+  "Créer ces enveloppes":"Create these envelopes",
+  "🚀 C'est parti !":"🚀 Let's go!",
+  "Tout reste modifiable plus tard dans Réglages.":"Everything stays editable later in Settings.",
+  /* --- CSV --- */
+  "Import du relevé":"Statement import",
+  "Importer les dépenses":"Import expenses",
+  "Catégories devinées automatiquement — modifiables après en tapant une dépense.":"Categories guessed automatically — editable afterwards by tapping an expense.",
+  "Rien de nouveau à importer":"Nothing new to import",
+  "Aucune opération reconnaissable dans ce fichier":"No recognizable transactions in this file",
+  "Import impossible : fichier invalide":"Import failed: invalid file",
+  "Dépense importée":"Imported expense",
+  /* --- Toasts / messages --- */
+  "Entre un montant valide":"Enter a valid amount",
+  "✓ Dépense ajoutée":"✓ Expense added",
+  "✓ Modifiée":"✓ Updated",
+  "＋ Dupliquée pour aujourd'hui":"＋ Duplicated for today",
+  "Il faut au moins une catégorie":"At least one category is required",
+  "Donne un nom à la catégorie":"Give the category a name",
+  "Cette catégorie existe déjà":"This category already exists",
+  "✓ Catégorie modifiée":"✓ Category updated",
+  "✓ Récurrence mise à jour":"✓ Recurring expense updated",
+  "Récurrence arrêtée":"Recurring expense stopped",
+  "🔁 Récurrence programmée":"🔁 Recurring expense scheduled",
+  "On te rappelle dans 3 jours":"We'll remind you in 3 days",
+  "Objectif supprimé":"Goal deleted",
+  "Nom et montant cible requis":"Name and target amount required",
+  "Montant trop grand":"Amount too large",
+  "Données effacées":"Data erased",
+  "Budget mis à jour":"Budget updated",
+  "Enveloppe mise à jour":"Envelope updated",
+  "Profil mis à jour":"Profile updated",
+  "Devise :":"Currency:",
+  "💾 Sauvegarde exportée":"💾 Backup exported",
+  "⚠️ Sauvegarde impossible — exporte tes données (Réglages → Données)":"⚠️ Backup failed — export your data (Settings → Data)",
+  "Sika : impossible d'enregistrer":"Sika: unable to save",
+  "🛜 Connexion rétablie":"🛜 Back online",
+  "Modes hors ligne : tes données restent disponibles":"Offline mode: your data stays available",
+  "📲 L'app fonctionne hors ligne":"📲 The app works offline",
+  "Supprimer TOUTES les dépenses ? Cette action est irréversible.":"Delete ALL expenses? This cannot be undone.",
+  "Supprimer":"Delete",
+  "Modifier":"Edit",
+  "Supprimer l'objectif":"Delete goal",
+  "Aucune sauvegarde depuis la création — ton historique mérite un fichier":"No backup since day one — your history deserves a file",
+  "Aucune dépense récurrente":"No recurring expenses",
+  "＋ Nouvelle dépense":"＋ New expense",
+  /* --- divers --- */
+  "Moyenne":"Average",
+  "Total":"Total",
+  "Transactions":"Transactions",
+  "Stats":"Stats",
+  "Répartition":"Split",
+  "% seulement":"% only",
+  "Montant":"Amount",
+  "Aucune dépense pour le moment.":"No expenses yet.",
+  "Tape ＋ pour en ajouter une.":"Tap ＋ to add one.",
+  "· atteint !":"· reached!",
+};
+/* Chaînes paramétrées (l'EN remplace le gabarit, {x} remplacés par les params) */
+const I18N_EN_T = {
+  "Catégorie {a}, {b}, glisse à droite pour modifier, à gauche pour supprimer":"Category {a}, {b}, swipe right to edit, left to delete",
+  "Dépense : {a}, {b}":"Expense: {a}, {b}",
+  "Enveloppe mensuelle : {a}":"Monthly envelope: {a}",
+  "{a} de trop":"{a} over budget",
+  "{a} restants":"{a} left",
+  "Dépensé ce mois : {a} · Budget {b}":"Spent this month: {a} · Budget {b}",
+  "{n} transaction(s) · {t}":"{n} transaction(s) · {t}",
+  "Afficher plus ({n} restantes)":"Show more ({n} left)",
+  "Dernière sauvegarde : il y a {n} jour{p}":"Last backup: {n} day{p} ago",
+  "📊 Fin de {m} — sauvegarde du mois":"📊 {m} is over — monthly backup",
+  "{n} dépense(s) en {m} : archive-les dans un fichier JSON avant de tourner la page":"{n} expense(s) in {m}: archive them to a JSON file before turning the page",
+  "{n} opération(s)":"{n} transaction(s)",
+  "Total : ":"Total: ",
+  "📥 {n} dépense(s) importée(s)":"📥 {n} expense(s) imported",
+  "+{a} épargnés":"+{a} saved",
+  "{a} retirés":"{a} withdrawn",
+  "🎯 Objectif « {a} » créé":"🎯 Goal « {a} » created",
+  "🎉 Objectif « {a} » atteint !":"🎉 Goal « {a } » reached!",
+  "Supprimer l'objectif « {a} » ?":"Delete goal « {a} »?",
+  "({a} épargnés sont à remettre de côté de ton côté.)":"({a} saved — remember to set it aside yourself.)",
+  "Supprimer la catégorie « {a} » ?":"Delete category « {a} »?",
+  "Supprimer « {a} » ?":"Delete « {a} »?",
+  "Supprimer « {a} » ({b}) ?":"Delete « {a} » ({b})?",
+  "« {a} » supprimée — tout déplacé vers « {b} »":"« {a} » deleted — everything moved to « {b} »",
+  "« {a} » supprimée":"« {a} » deleted",
+  "« {a} » ajoutée":"« {a} » added",
+  "✓ « {a} » ajoutée":"✓ « {a} » added",
+  "Arrêter la récurrence de « {a} » ?":"Stop recurring expense « {a} »?",
+  "Import du relevé · {n} opérations":"Statement import · {n} transactions",
+  "Importer {n} dépense(s) ?\nToutes les données actuelles seront remplacées.":"Import {n} expense(s)?\nAll current data will be replaced.",
+  "👋 Bienvenue, {a} !":"👋 Welcome, {a}!",
+  "chaque {a}":"every {a}",
+  "le {a} de chaque mois":"on day {a} of every month",
+  "Modifier la récurrence {a}":"Edit recurring expense {a}",
+  "{n} dépense(s)":"{n} expense(s)",
+  "{n} récurrence(s)":"{n} recurring expense(s)",
+  "{n} et {c} utilisent cette catégorie. Où les déplacer ?":"{n} and {c} use this category. Where should they go?",
+  "Épargner · ":"Set aside: ",
+  "Épargner · {a}":"Set aside: {a}",
+  "Devise : {a}":"Currency: {a}",
+  "👋 Bienvenue dans Sika !":"👋 Welcome to Sika!",
+  "Bonjour":"Hello",
+  "Bonsoir":"Good evening",
+  "1 dépense":"1 expense",
+  "1 récurrence":"1 recurring expense",
+  "et":"and"
+};
+function i18nLang(){
+  const set = state && state.lang;
+  if (set === "fr" || set === "en") return set;
+  return (navigator.language||"").toLowerCase().startsWith("en") ? "en" : "fr";
+}
+let LANG = "fr";
+function t(s){ return LANG==="en" ? (I18N_EN[s] ?? s) : s; }
+function tt(key, params){
+  const s = LANG==="en" ? (I18N_EN_T[key] ?? key) : key;
+  return s.replace(/\{(\w+)\}/g, (_,k)=> (params && params[k] !== undefined) ? params[k] : "");
+}
+/* Passe automatique : nœuds texte + attributs traduits si correspondance exacte */
+const __i18nText = new WeakMap();   // nœud texte → valeur originale
+const __i18nAttr = new WeakMap();   // élément → { attribut : valeur originale }
+function i18nWalk(root){
+  root = root.nodeType === 1 ? root : root.parentElement;
+  if (!root) return;
+  if (root.tagName !== "SCRIPT" && root.tagName !== "STYLE"){
+    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode(n){
+      return n.parentElement && n.parentElement.closest("script,style") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+    }});
+    w.currentNode = root;
+    while (w.nextNode()){
+      const n = w.currentNode;
+      const raw = n.nodeValue; if (!raw || !raw.trim()) continue;
+      const key = raw.trim().replace(/\s+/g," ");
+      const en = I18N_EN[key];
+      if (en === undefined || en === key) continue;
+      if (!__i18nText.has(n)) __i18nText.set(n, raw);
+      n.nodeValue = key === raw ? en : raw.replace(key, en);
+    }
+  }
+  root.querySelectorAll && root.querySelectorAll("[placeholder],[aria-label],[title]").forEach(el=>{
+    ["placeholder","aria-label","title"].forEach(a=>{
+      const v = el.getAttribute(a); if (!v || v.trim() !== v) return;
+      const en = I18N_EN[v]; if (en === undefined || en === v) return;
+      const store = __i18nAttr.get(el) || {};
+      if (!(a in store)) store[a] = v;
+      __i18nAttr.set(el, store);
+      el.setAttribute(a, en);
+    });
+  });
+}
+function i18nRestore(){
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  while (w.nextNode()){ const n = w.currentNode; if (__i18nText.has(n)){ n.nodeValue = __i18nText.get(n); } }
+  document.querySelectorAll("[placeholder],[aria-label],[title]").forEach(el=>{
+    const store = __i18nAttr.get(el); if (!store) return;
+    Object.entries(store).forEach(([a,v])=>el.setAttribute(a,v));
+    __i18nAttr.delete(el);
+  });
+}
+/* Anti ping-pong : on suspend l'observer pendant la traduction (pattern
+   disconnect/observe) — sinon chaque mutation traduite re-déclenche l'observer
+   en boucle. */
+function i18nProcess(muts){
+  __i18nObs.disconnect();
+  try {
+    muts.forEach(m=>{
+      if (m.type === "characterData") i18nWalk(m.target);
+      else if (m.type === "attributes" && m.attributeName && /^(placeholder|aria-label|title)$/.test(m.attributeName)) i18nWalk(m.target);
+      m.addedNodes.forEach(n=>{ if (n.nodeType === 1 || n.nodeType === 3) i18nWalk(n); });
+    });
+  } finally {
+    __i18nObs.observe(document.body, { childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:["placeholder","aria-label","title"] });
+  }
+}
+const __i18nObs = new MutationObserver(muts=>{
+  if (LANG !== "en") return;
+  Promise.resolve().then(()=>i18nProcess(muts));
+});
+
+function applyI18n(){
+  LANG = i18nLang();
+  document.documentElement.lang = LANG;
+  if (LANG === "en") i18nWalk(document.body);
+  else i18nRestore();
+}
+/* Changement de langue : repasse le static puis re-rend tout (les rendus JS
+   écrivent du FR, traduit à la volée par l'observer) */
+function applyI18nFull(){
+  renderLangRow();
+  applyI18n();
+  render();
+  const active = document.querySelector(".page.active");
+  if (active){ /* le contenu dynamique est couvert par re-render ci-dessus */ }
+  if (!state.onboarded) showOnboarding();
+}
+
 // Échappe toute donnée utilisateur avant interpolation dans innerHTML (anti-XSS)
 function esc(s){
   return String(s ?? "")
@@ -1274,9 +1637,9 @@ function catBudgetTotal(){
 const todayISO = () => ymd(new Date());
 function dayName(iso){
   const d = new Date(iso + "T12:00:00"); const now = new Date();
-  if (iso === todayISO()) return "Aujourd'hui";
-  if (iso === ymd(new Date(now.getTime()-DAY))) return "Hier";
-  return d.toLocaleDateString('fr-FR',{weekday:'long', day:'numeric', month:'long'});
+  if (iso === todayISO()) return t("Aujourd'hui");
+  if (iso === ymd(new Date(now.getTime()-DAY))) return t("Hier");
+  return d.toLocaleDateString(I18N_LOCALE(),{weekday:'long', day:'numeric', month:'long'});
 }
 
 /* ============ Rendu ============ */
@@ -1304,7 +1667,7 @@ function renderEnvelopes(){
   host.innerHTML = rows.map(([k,b])=>{
     const c = catOf(k), nb = +b, s = spendByCat[k]||0;
     const pct = nb ? Math.min(s/nb*100,100) : 0, over = s > nb;
-    const rest = over ? money(s-nb)+" de trop" : money(nb-s)+" restants";
+    const rest = over ? tt("{a} de trop", {a: money(s-nb)}) : tt("{a} restants", {a: money(nb-s)});
     return `<div class="env">
       <div class="env-top">
         <div class="dot" style="background:${c.color}"></div>
@@ -1341,11 +1704,12 @@ function backupReminder(){
   const prevCount = state.expenses.filter(e=>e.date.startsWith(pmKey)).length;
   const monthly = new Date().getDate() <= 7 && prevCount > 0 && state.lastMonthlyBackup !== pmKey;
   if (monthly){
-    const pmLabel = new Date(pmKey+"T12:00:00").toLocaleDateString("fr-FR",{month:"long", year:"numeric"});
+    const pmLabel = new Date(pmKey+"T12:00:00").toLocaleDateString(I18N_LOCALE(),{month:"long", year:"numeric"});
+    const pmShort = LANG==="en" ? pmLabel.replace(/^(\w+).*/, "$1") : pmLabel.split(" ")[0];
     card.style.display = "block";
-    document.getElementById("bk-title").textContent = "📊 Fin de " + pmLabel.split(" ")[0] + " — sauvegarde du mois";
+    document.getElementById("bk-title").textContent = tt("📊 Fin de {m} — sauvegarde du mois", {m: pmShort});
     document.getElementById("bk-sub").textContent =
-      `${prevCount} dépense${prevCount>1?"s":""} en ${pmLabel} : archive-les dans un fichier JSON avant de tourner la page`;
+      tt("{n} dépense(s) en {m} : archive-les dans un fichier JSON avant de tourner la page", {n: prevCount, m: pmLabel});
     return;
   }
   // Rappel hebdomadaire (comportement historique)
@@ -1353,10 +1717,10 @@ function backupReminder(){
   const stale = !backed || (changed && changed > backed) || since > 7;
   if (stale){
     card.style.display = "block";
-    document.getElementById("bk-title").textContent = "💾 Sauvegarde conseillée";
+    document.getElementById("bk-title").textContent = t("💾 Sauvegarde conseillée");
     document.getElementById("bk-sub").textContent = backed
-      ? `Dernière sauvegarde : il y a ${since} jour${since>1?"s":""}`
-      : "Aucune sauvegarde depuis la création — ton historique mérite un fichier";
+      ? tt("Dernière sauvegarde : il y a {n} jour{p}", {n: since, p: since>1 ? "s" : ""})
+      : t("Aucune sauvegarde depuis la création — ton historique mérite un fichier");
   } else card.style.display = "none";
 }
 function renderHome(){
@@ -1370,7 +1734,7 @@ function renderHome(){
     const pct = Math.min(spent/bud*100,100);
     labelEl.textContent = "Solde mensuel restant";
     document.getElementById("hero-remaining").textContent = money(Math.max(remaining,0));
-    document.getElementById("hero-spent").textContent = `Dépensé ce mois : ${money(spent)} · Budget ${money(bud)}`;
+    document.getElementById("hero-spent").textContent = tt("Dépensé ce mois : {a} · Budget {b}", {a: money(spent), b: money(bud)});
     document.getElementById("hero-bar").firstElementChild.style.width = pct+"%";
     document.getElementById("hero-bar").firstElementChild.style.background = remaining<0 ? "var(--red)" : "#fff";
     barWrap.style.visibility = "visible";
@@ -1419,7 +1783,7 @@ function renderList(elId, items, compact){
   items.forEach(e=>{ (groups[e.date] = groups[e.date]||[]).push(e); });
   let html = "";
   const dates = Object.keys(groups).sort().reverse();
-  if (!dates.length){ host.innerHTML = '<div class="empty">Aucune dépense pour le moment.<br>Tape ＋ pour en ajouter une.</div>'; return; }
+  if (!dates.length){ host.innerHTML = `<div class="empty">${t("Aucune dépense pour le moment.")}<br>${t("Tape ＋ pour en ajouter une.")}</div>`; return; }
   if (compact){
     const g = document.createElement("div"); g.className="group";
     groups[dates[0]] = groups[dates[0]];
@@ -1429,7 +1793,7 @@ function renderList(elId, items, compact){
       const c=catOf(e.cat);
       const r=document.createElement("div"); r.className="rowitem";
       r.setAttribute("role","button"); r.tabIndex=0;
-      r.setAttribute("aria-label","Dépense : "+e.name+", "+money(e.amount));
+      r.setAttribute("aria-label", tt("Dépense : {a}, {b}", {a: e.name, b: money(e.amount)}));
       r.innerHTML=`<div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
         <div class="txt"><div class="n">${esc(e.name)}</div><div class="d">${esc(c.label)} · ${dayName(e.date)}</div></div>
         <div class="amt">-${money(e.amount)}</div>`;
@@ -1439,12 +1803,12 @@ function renderList(elId, items, compact){
   } else {
     dates.forEach(d=>{
       const day = groups[d];
-      const t = day.reduce((s,e)=>s+e.amount,0);
-      html += `<div class="list-header"><span class="t" style="font-size:15px;color:var(--secondary-label);text-transform:capitalize">${dayName(d)}</span><span style="font-size:13px;color:var(--secondary-label);font-weight:600">${money(t)}</span></div>`;
+      const tot = day.reduce((s,e)=>s+e.amount,0);
+      html += `<div class="list-header"><span class="t" style="font-size:15px;color:var(--secondary-label);text-transform:capitalize">${dayName(d)}</span><span style="font-size:13px;color:var(--secondary-label);font-weight:600">${money(tot)}</span></div>`;
       html += `<div class="group">`;
       day.sort((a,b)=>b.id.localeCompare(a.id)).forEach(e=>{
         const c=catOf(e.cat);
-        html += `<div class="rowitem" data-id="${e.id}" role="button" tabindex="0" aria-label="Dépense : ${esc(e.name)}, ${money(e.amount)}">
+        html += `<div class="rowitem" data-id="${e.id}" role="button" tabindex="0" aria-label="${esc(tt("Dépense : {a}, {b}", {a: e.name, b: money(e.amount)}))}">
           <div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
           <div class="txt"><div class="n">${esc(e.name)}</div><div class="d">${esc(c.label)}</div></div>
           <div class="amt">-${money(e.amount)}</div></div>`;
@@ -1478,14 +1842,14 @@ function renderStats(period){
     items = state.expenses.filter(e=>{ const d=new Date(e.date+"T12:00:00"); return d>=start && d<=end; });
   }
   const total = items.reduce((s,e)=>s+e.amount,0);
-  const lbl = period==="month" ? "du mois" : period==="w" ? "de la semaine" : "de l'année";
+  const lbl = period==="month" ? "Total du mois" : period==="w" ? "Total de la semaine" : "Total de l'année";
   const days = period==="month" ? new Date().getDate()
     : period==="w" ? Math.min(((now.getDay()+6)%7)+1, 7)
     : Math.ceil((now-new Date(now.getFullYear(),0,1))/DAY);
   const avg = total/Math.max(days,1);
   const maxT = Math.max(...items.map(e=>e.amount),0);
   document.getElementById("stat-grid").innerHTML = `
-    <div class="stat"><div class="sv">${money(total)}</div><div class="sl">Total ${lbl}</div></div>
+    <div class="stat"><div class="sv">${money(total)}</div><div class="sl">${t(lbl)}</div></div>
     <div class="stat"><div class="sv">${money(avg)}</div><div class="sl">Moyenne / jour</div></div>
     <div class="stat"><div class="sv">${items.length}</div><div class="sl">Transactions</div></div>
     <div class="stat"><div class="sv">${money(maxT)}</div><div class="sl">Plus grosse dépense</div></div>
@@ -1497,7 +1861,7 @@ function renderStats(period){
   // 6 derniers mois
   const mm=[];
   for(let i=5;i>=0;i--){ const d=new Date(now.getFullYear(), now.getMonth()-i, 1); const key=ymd(d).slice(0,7);
-    mm.push({key, label:d.toLocaleDateString('fr-FR',{month:'short'}), v: state.expenses.filter(e=>e.date.startsWith(key)).reduce((s,e)=>s+e.amount,0)}); }
+    mm.push({key, label:d.toLocaleDateString(I18N_LOCALE(),{month:'short'}), v: state.expenses.filter(e=>e.date.startsWith(key)).reduce((s,e)=>s+e.amount,0)}); }
   const mMax=Math.max(...mm.map(m=>m.v),1);
   document.getElementById("bars").innerHTML = mm.map((m,i)=>
     `<div class="col"><div class="stick ${i===mm.length-1?"":"other"}" style="height:${Math.max(m.v/mMax*100,3)}%"></div><div class="ml">${m.label}</div></div>`).join("");
@@ -1512,7 +1876,7 @@ function renderCatGrid(){
   const grid=document.getElementById("cat-grid");
   grid.innerHTML = Object.entries(state.cats).map(([k,c])=>
     `<button class="cat ${k===pickedCat?"on":""}" data-k="${k}">${esc(c.emoji)} ${esc(c.label)}</button>`).join("") +
-    `<button class="cat new" onclick="closeSheet(); openCatSheet()">＋ Nouvelle</button>`;
+    `<button class="cat new" onclick="closeSheet(); openCatSheet()">${t("＋ Nouvelle")}</button>`;
   grid.querySelectorAll(".cat[data-k]").forEach(b=>b.onclick=()=>{
     pickedCat=b.dataset.k;
     grid.querySelectorAll(".cat[data-k]").forEach(x=>x.classList.toggle("on",x.dataset.k===pickedCat));
@@ -1545,7 +1909,7 @@ function saveExpense(){
 }
 function deleteFlow(id){
   const e = state.expenses.find(x=>x.id===id); if(!e) return;
-  if (confirm(`Supprimer « ${e.name} » (${money(e.amount)}) ?`)){
+  if (confirm(tt("Supprimer « {a} » ({b}) ?", {a: e.name, b: money(e.amount)}))){
     state.expenses = state.expenses.filter(x=>x.id!==id);
     save(); render();
   }
@@ -1599,7 +1963,7 @@ function clearSheetOverlay(){
   document.getElementById("overlay").classList.remove("show"); syncScrollLock();
 }
 function closeAllSheets(){
-  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet();
+  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet(); closeLangSheet();
   closeOpenSwipe();
   clearSheetOverlay();
 }
@@ -1632,9 +1996,9 @@ function renderCats(){
       <div class="swipe-actions" style="right:0"><button class="sw-btn del" aria-label="Supprimer la catégorie">🗑️<span>Supprimer</span></button></div>`;
     const front = document.createElement("div"); front.className = "swipe-front setrow";
     front.setAttribute("role","button"); front.tabIndex = 0;
-    front.setAttribute("aria-label", `Catégorie ${c.label}, ${count===1?"1 dépense":count+" dépenses"}, glisse à droite pour modifier, à gauche pour supprimer`);
+    front.setAttribute("aria-label", tt(`Catégorie {a}, {b}, glisse à droite pour modifier, à gauche pour supprimer`, {a: c.label, b: count===1 ? t("1 dépense") : tt("{n} dépense(s)", {n: count})}));
     front.innerHTML = `<div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
-      <div class="n">${esc(c.label)}<span style="font-size:12px;color:var(--secondary-label);margin-left:7px">${count===1?"1 dépense":count+" dépenses"}</span></div>`;
+      <div class="n">${esc(c.label)}<span style="font-size:12px;color:var(--secondary-label);margin-left:7px">${count===1 ? t("1 dépense") : tt("{n} dépense(s)", {n: count})}</span></div>`;
     front.onclick = () => { if (openSwipe){ closeOpenSwipe(); return; } openEditCat(k); };
     front.onkeydown = e => { if (e.key==="Enter" || e.key===" "){ e.preventDefault(); openEditCat(k); } };
     attachSwipe(wrap, front, ()=>openEditCat(k), ()=>deleteCat(k));
@@ -1690,16 +2054,16 @@ function deleteCat(k){
   const count = state.expenses.filter(e=>e.cat===k).length;
   const recCount = (state.recurring||[]).filter(r=>r.cat===k).length;
   if (!count && !recCount){
-    if (!confirm(`Supprimer la catégorie « ${c.label} » ?`)) return;
+    if (!confirm(tt("Supprimer la catégorie « {a} » ?", {a: c.label}))) return;
     applyDeleteCat(k, null);
     return;
   }
   delCatKey = k;
-  document.getElementById("delcat-title").textContent = `Supprimer « ${c.label} » ?`;
+  document.getElementById("delcat-title").textContent = tt("Supprimer « {a} » ?", {a: c.label});
   const parts = [];
-  if (count) parts.push(count===1 ? "1 dépense" : `${count} dépenses`);
-  if (recCount) parts.push(recCount===1 ? "1 récurrence" : `${recCount} récurrences`);
-  document.getElementById("delcat-sub").textContent = `${parts.join(" et ")} utilisent cette catégorie. Où les déplacer ?`;
+  if (count) parts.push(count===1 ? t("1 dépense") : tt("{n} dépense(s)", {n: count}));
+  if (recCount) parts.push(recCount===1 ? t("1 récurrence") : tt("{n} récurrence(s)", {n: recCount}));
+  document.getElementById("delcat-sub").textContent = tt("{n} et {c} utilisent cette catégorie. Où les déplacer ?", {n: parts[0], c: parts[1] || ""}).trim();
   const sel = document.getElementById("delcat-target");
   sel.innerHTML = Object.entries(state.cats).filter(([key])=>key!==k).map(([key,c2])=>
     `<option value="${key}" ${key==="other"?"selected":""}>${esc(c2.emoji)} ${esc(c2.label)}</option>`).join("");
@@ -1727,7 +2091,38 @@ function applyDeleteCat(k, target){
   delCatKey = null;
   closeDelCatSheet(); clearSheetOverlay();
   save(); renderHistFilter(); renderCatGrid(); render();
-  toast(target ? `« ${c.label} » supprimée — tout déplacé vers « ${catOf(target).label} »` : `« ${c.label} » supprimée`);
+  toast(target ? tt("« {a} » supprimée — tout déplacé vers « {b} »", {a: c.label, b: catOf(target).label}) : tt("« {a} » supprimée", {a: c.label}));
+}
+/* ============ Langue ============ */
+const LANG_OPTIONS = [
+  ["auto","Système"],
+  ["fr","Français"],
+  ["en","English"],
+];
+function openLangSheet(){
+  const host = document.getElementById("lang-opts");
+  host.innerHTML = LANG_OPTIONS.map(([v,label])=>
+    `<button class="lang-opt" data-v="${v}" style="display:block;width:100%;text-align:left;padding:12px 14px;border:0;border-radius:12px;background:var(--fill);margin-top:8px;font-size:16px;font-family:inherit;color:var(--label);cursor:pointer">
+      <span style="float:right;color:var(--secondary-label);font-size:13px">${(state.lang||"auto")===v ? "✓" : ""}</span>${label}</button>`).join("");
+  host.querySelectorAll(".lang-opt").forEach(b=>b.onclick=()=>setLang(b.dataset.v));
+  document.getElementById("lang-title").textContent = t("Langue");
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("lang-sheet").classList.add("show"); syncScrollLock();
+}
+function closeLangSheet(){
+  document.getElementById("lang-sheet").classList.remove("show");
+  document.getElementById("overlay").classList.remove("show"); syncScrollLock();
+}
+function renderLangRow(){
+  document.getElementById("lang-row-label").textContent = t("Langue");
+  const cur = state.lang || "auto";
+  document.getElementById("lang-current").textContent =
+    cur==="auto" ? t("Système") : cur==="fr" ? "Français" : "English";
+}
+function setLang(v){
+  state.lang = v; save();
+  closeAllSheets();
+  applyI18nFull();
 }
 function closeDelCatSheet(){
   document.getElementById("delcat-sheet").classList.remove("show");
@@ -1743,7 +2138,7 @@ function renderBudgets(){
     row.innerHTML = `<div class="icon-badge" style="background:${c.color}22">${c.emoji}</div>
       <div class="n">${esc(c.label)}</div>
       <input class="budgets-input" type="text" inputmode="decimal" placeholder="—"
-             aria-label="Enveloppe mensuelle : ${esc(c.label)}" data-k="${k}" value="${(+state.budgets[k]||"")}">
+             aria-label="${esc(tt("Enveloppe mensuelle : {a}", {a: c.label}))}" data-k="${k}" value="${(+state.budgets[k]||"")}">
       <span class="v">${state.currency}</span>`;
     host.appendChild(row);
   });
@@ -1790,7 +2185,7 @@ function saveNewCat(){
   state.cats[key] = { label: name, emoji: newEmoji, color: newColor };
   pickedCat = key;
   save(); closeCatSheet(); renderHistFilter(); render();
-  toast(`✓ « ${name} » ajoutée`);
+  toast(tt("✓ « {a} » ajoutée", {a: name}));
 }
 
 /* ============ Modifier une catégorie (swipe) ============ */
@@ -1873,12 +2268,12 @@ function saveGoal(){
   if (!name || !t || t<=0){ toast("Nom et montant cible requis"); return; }
   state.goals.push({ id:crypto.randomUUID(), name, target:t, saved:0 });
   save(); closeSheet(); closeGoalSheets(); render();
-  toast(`🎯 Objectif « ${name} » créé`);
+  toast(tt("🎯 Objectif « {a} » créé", {a: name}));
 }
 function openGoalContrib(id){
   const g = state.goals.find(x=>x.id===id); if(!g) return;
   contribGoalId = id;
-  document.getElementById("goal-contrib-title").textContent = "Épargner · " + g.name;
+  document.getElementById("goal-contrib-title").textContent = tt("Épargner · {a}", {a: g.name});
   document.getElementById("goal-contrib-cur").textContent = state.currency;
   document.getElementById("goal-contrib-amount").value = "";
   document.getElementById("overlay").classList.add("show"); syncScrollLock();
@@ -1899,7 +2294,7 @@ function contributeToGoal(){
   document.getElementById("overlay").classList.add("show"); syncScrollLock();
   const done = g.saved >= g.target;
   render();
-  toast(done ? `🎉 Objectif « ${g.name} » atteint !` : `+${money(v)} épargnés`);
+  toast(done ? tt("🎉 Objectif « {a} » atteint !", {a: g.name}) : tt("+{a} épargnés", {a: money(v)}));
 }
 function withdrawFromGoal(){
   const g = state.goals.find(x=>x.id===contribGoalId); if(!g) return;
@@ -1907,11 +2302,11 @@ function withdrawFromGoal(){
   if (v<=0){ toast("Entre un montant valide"); return; }
   g.saved = Math.max(0, g.saved - v);
   save(); closeGoalSheets(); render();
-  toast(`${money(v)} retirés`);
+  toast(tt("{a} retirés", {a: money(v)}));
 }
 function deleteGoal(id){
   const g = state.goals.find(x=>x.id===id); if(!g) return;
-  if (!confirm(`Supprimer l'objectif « ${g.name} » ?${g.saved>0 ? "\n("+money(+g.saved)+" épargnés sont à remettre de côté de ton côté.)" : ""}`)) return;
+  if (!confirm(tt("Supprimer l'objectif « {a} » ?", {a: g.name}) + (g.saved>0 ? "\n(" + tt("({a} épargnés sont à remettre de côté de ton côté.)", {a: money(+g.saved)}) + ")" : ""))) return;
   state.goals = state.goals.filter(x=>x.id!==id);
   save(); render();
   toast("Objectif supprimé");
@@ -1963,7 +2358,7 @@ function closeRecSheet(){
 function deleteRecFromEdit(){
   if (!editRec) return;
   const r = editRec;
-  if (!confirm(`Arrêter la récurrence de « ${r.name} » ?`)) return;
+  if (!confirm(tt("Arrêter la récurrence de « {a} » ?", {a: r.name}))) return;
   const idx = state.recurring.indexOf(r);
   if (idx > -1) state.recurring.splice(idx, 1);
   save(); closeRecSheet(); clearSheetOverlay(); renderRecurring(); render();
@@ -2101,7 +2496,7 @@ function importBackup(file){
       const data = JSON.parse(fr.result);
       const s = (data && data.state) ? data.state : data;
       if (!s || !Array.isArray(s.expenses)) throw new Error("format");
-      if (!confirm(`Importer ${s.expenses.length} dépense(s) ?\nToutes les données actuelles seront remplacées.`)) return;
+      if (!confirm(tt("Importer {n} dépense(s) ?\nToutes les données actuelles seront remplacées.", {n: s.expenses.length}))) return;
       // toute catégorie inconnue (import tiers) est remappée vers "other"
       const catsSrc = (Array.isArray(s.cats) ? null : s.cats) || {};
       const knownCat = k => Object.prototype.hasOwnProperty.call(catsSrc, k) ? k : null;
@@ -2160,7 +2555,7 @@ function applyHistoryFilter(){
   if (q) items = items.filter(e=> e.name.toLowerCase().includes(q) || catOf(e.cat).label.toLowerCase().includes(q));
   const total = items.reduce((s,e)=>s+e.amount,0);
   document.getElementById("history-sub").textContent =
-    items.length + " transaction" + (items.length>1?"s":"") + " · " + money(total);
+    tt("{n} transaction(s) · {t}", {n: items.length, t: money(total)});
   const shown = items.slice(0, histShown);
   renderList("history-list", shown, false);
   if (items.length > shown.length){
@@ -2169,7 +2564,7 @@ function applyHistoryFilter(){
     btn.className = "btn-ghost";
     btn.style.margin = "8px 16px 0";
     btn.style.width = "calc(100% - 32px)";
-    btn.textContent = `Afficher plus (${items.length - shown.length} restantes)`;
+    btn.textContent = tt("Afficher plus ({n} restantes)", {n: items.length - shown.length});
     btn.onclick = () => { histShown += HIST_PAGE; applyHistoryFilter(); };
     host.appendChild(btn);
   }
@@ -2284,14 +2679,14 @@ function obFinish(mode, skipped){
   document.getElementById("onboard").classList.remove("show");
   switchTab("home");
   render();
-  toast(state.user.name ? `👋 Bienvenue, ${state.user.name} !` : "👋 Bienvenue dans Sika !");
+  toast(state.user.name ? tt("👋 Bienvenue, {a} !", {a: state.user.name}) : t("👋 Bienvenue dans Sika !"));
 }
 
 function updateGreeting(){
   const n = (state.user && state.user.name) || "";
   const h = new Date().getHours();
-  const g = (h >= 18 || h < 5) ? "Bonsoir" : "Bonjour";
-  document.getElementById("home-title").textContent = n ? `${g}, ${n}` : "Aujourd'hui";
+  const g = t((h >= 18 || h < 5) ? "Bonsoir" : "Bonjour");
+  document.getElementById("home-title").textContent = n ? `${g}, ${n}` : t("Aujourd'hui");
   const initial = n ? (Array.from(n)[0] || "?").toUpperCase() : "👤";
   document.getElementById("home-avatar").textContent = initial;
   document.getElementById("avatar-set").textContent = initial;
@@ -2311,6 +2706,7 @@ function resetAll(){
 
 function render(){
   updateGreeting();
+  renderLangRow();
   document.getElementById("set-cur").textContent = state.currency;
   if (document.getElementById("page-home").classList.contains("active")) renderHome();
   else if (document.getElementById("page-stats").classList.contains("active")) {
@@ -2351,7 +2747,7 @@ document.getElementById("budget-input").addEventListener("change", e=>{
   }
 });
 document.getElementById("currency-select").addEventListener("change", e=>{
-  state.currency=e.target.value; save(); toast("Devise : "+state.currency);
+  state.currency=e.target.value; save(); toast(tt("Devise : {a}", {a: state.currency}));
 });
 document.getElementById("import-file").addEventListener("change", e=>{
   const f = e.target.files && e.target.files[0];
@@ -2430,7 +2826,8 @@ document.addEventListener("input", e=>{
 enableSwipeClose(document.getElementById("sheet"), closeSheet);
 enableSwipeClose(document.getElementById("cat-sheet"), closeCatSheet);
 enableSwipeClose(document.getElementById("rec-sheet"), ()=>{ closeSheet(); closeRecSheet(); });
-enableSwipeClose(document.getElementById("delcat-sheet"), ()=>{ closeDelCatSheet(); clearSheetOverlay(); });
+enableSwipeClose(document.getElementById("delcat-sheet"), ()=>{ closeDelCatSheet(); });
+enableSwipeClose(document.getElementById("lang-sheet"), ()=>{ closeLangSheet(); });
 enableSwipeClose(document.getElementById("goal-sheet"), ()=>{ closeSheet(); closeGoalSheets(); });
 enableSwipeClose(document.getElementById("goal-contrib-sheet"), ()=>{ closeSheet(); closeGoalSheets(); });
 enableSwipeClose(document.getElementById("edit-sheet"), ()=>{ closeEditSheet(); clearSheetOverlay(); syncScrollLock(); });
@@ -2439,7 +2836,7 @@ document.getElementById("cat-edit-name").addEventListener("keydown", e=>{ if(e.k
 
 /* ============ Init ============ */
 load();
-document.getElementById("today-date").textContent = new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'});
+document.getElementById("today-date").textContent = new Date().toLocaleDateString(I18N_LOCALE(),{weekday:'long',day:'numeric',month:'long'});
 document.getElementById("budget-input").value = state.budget;
 document.getElementById("currency-select").value = state.currency;
 document.getElementById("user-name-input").addEventListener("change", e=>{
@@ -2507,6 +2904,8 @@ document.getElementById("ob-budget").addEventListener("input", ()=>{
     parseAmount(document.getElementById("ob-budget").value) > 0 ? "Continuer" : "Continuer sans budget";
 });
 renderHistFilter();
+applyI18n();
+__i18nObs.observe(document.body, { childList:true, subtree:true, characterData:true, attributes:true, attributeFilter:["placeholder","aria-label","title"] });
 render();
 if (!state.onboarded) showOnboarding();
 

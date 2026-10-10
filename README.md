@@ -23,6 +23,8 @@ HTML/CSS/JS vanilla dans un seul `index.html` (~100 Ko), **zéro dépendance**, 
 
 Icônes : source vectorielle unique `icons/icon.svg` (~0,9 Ko) → PNG compressés palette (~10–12 Ko) + **écrans de démarrage iOS** light/dark (une taille exacte par appareil, `apple-touch-startup-image`). Régénérables en 1 commande : `node scripts/gen-ios-assets.mjs` (script dev, nécessite `npm i sharp`, pas déployé).
 
+Langues : FR (source) + EN — sélecteur « Langue » dans Réglages (Système / Français / English), montants via `Intl.NumberFormat` selon la langue, dates et noms de jours/mois localisés. Les étiquettes des catégories par défaut sont créées dans la langue détectée à la première ouverture.
+
 Design : [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/) — SF Pro, couleurs système iOS, dark mode auto, safe-areas, header « liquid glass », sheets au ressort (`cubic-bezier(.32,.72,.33,1)`).
 
 ## Fichiers
