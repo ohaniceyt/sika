@@ -178,6 +178,14 @@
   }
   .avatar:active { transform: scale(.9); }
   .empty { text-align:center; color: var(--secondary-label); padding: 40px 20px; font-size: 15px; }
+  /* État vide iOS : icône en bulle, titre, sous-texte */
+  .empty-state { text-align:center; padding: 30px 20px 26px; color:var(--secondary-label); }
+  .empty-state .ico {
+    width:56px; height:56px; margin:0 auto 10px; border-radius:50%;
+    background:var(--fill); display:flex; align-items:center; justify-content:center; font-size:24px;
+  }
+  .empty-state .t { font-size:15px; font-weight:700; color:var(--label); margin-bottom:3px; }
+  .empty-state .s { font-size:13px; line-height:1.45; }
 
   /* ---------- Tab bar ---------- */
   .tabbar {
@@ -853,7 +861,7 @@
 <div class="sheet" id="sheet" role="dialog" aria-modal="true">
   <div class="grabber"></div>
   <h2>Nouvelle dépense</h2>
-  <div class="field">
+  <div class="field" id="chips-field">
     <label>Saisie rapide</label>
     <div class="chips" id="quick-chips"></div>
   </div>
@@ -1844,7 +1852,16 @@ const I18N_EN = {
   "Répartition":"Split",
   "% seulement":"% only",
   "Montant":"Amount",
-  "Aucune dépense pour le moment.":"No expenses yet.",
+    "Aucune dépense pour le moment.":"No expenses yet.",
+  "Pas encore de statistiques":"No stats yet",
+  "Ajoute ta première dépense — Sika dessinera tes stats ici.":"Add your first expense — Sika will draw your stats here.",
+  "Vérifie l'orthographe ou essaie un autre mot.":"Check the spelling or try another word.",
+  "Rien en {a} pour le moment":"Nothing in {a} yet",
+  "Ajoute une dépense dans cette catégorie — ou vois tout.":"Add an expense in this category — or see everything.",
+  "Rien ce mois":"Nothing this month",
+  "Les dépenses du couple s'ajouteront ici après une synchro.":"Couple expenses will collect here after a sync.",
+  "Vide":"Empty",
+
   "Tape ＋ pour en ajouter une.":"Tap ＋ to add one.",
   "· atteint !":"· reached!",
   "Activer le budget couple":"Enable couple budget",
@@ -1902,7 +1919,8 @@ const I18N_EN_T = {
   "Importer {n} dépense(s) ?\nToutes les données actuelles seront remplacées.":"Import {n} expense(s)?\nAll current data will be replaced.",
   "👋 Bienvenue, {a} !":"👋 Welcome, {a}!",
     "chaque {a}":"every {a}",
-  "échangé le {a}":"exchanged on {a}",
+    "échangé le {a}":"exchanged on {a}",
+  "Aucun résultat pour « {a} »":"No results for « {a} »",
   "doit {a} à {b}":"owes {a} to {b}",
   "Échange de {a}":"Exchange from {a}",
   "📥 {n} dépense(s) de {a} ajoutée(s)":"📥 {n} expense(s) from {a} added",
@@ -2208,13 +2226,19 @@ function drawDonut(svgId, legendId, byCat){
   });
 }
 
-function renderList(elId, items, compact){
+function emptyState(icon, title, sub){
+  return `<div class="empty-state"><div class="ico">${icon}</div><div class="t">${title}</div>${sub ? `<div class="s">${sub}</div>` : ""}</div>`;
+}
+function renderList(elId, items, compact, emptyMsg){
   const host = document.getElementById(elId);
   const groups = {};
   items.forEach(e=>{ (groups[e.date] = groups[e.date]||[]).push(e); });
   let html = "";
   const dates = Object.keys(groups).sort().reverse();
-  if (!dates.length){ host.innerHTML = `<div class="empty">${t("Aucune dépense pour le moment.")}<br>${t("Tape ＋ pour en ajouter une.")}</div>`; return; }
+  if (!dates.length){
+    host.innerHTML = emptyMsg || emptyState("📤", t("Aucune dépense pour le moment."), t("Tape ＋ pour en ajouter une."));
+    return;
+  }
   if (compact){
     const g = document.createElement("div"); g.className="group";
     groups[dates[0]] = groups[dates[0]];
@@ -2279,6 +2303,15 @@ function renderStats(period){
     : Math.ceil((now-new Date(now.getFullYear(),0,1))/DAY);
   const avg = total/Math.max(days,1);
   const maxT = Math.max(...items.map(e=>e.amount),0);
+  if (!items.length){
+    document.getElementById("stat-grid").innerHTML =
+      `<div class="stat" style="grid-column:1/-1;padding:26px 16px">${emptyState("📊", t("Pas encore de statistiques"), t("Ajoute ta première dépense — Sika dessinera tes stats ici."))}</div>`;
+    drawDonut("donut2","legend2",{});
+    document.getElementById("bars").closest(".card").style.display = "none";
+    document.getElementById("compare-card").style.display = "none";
+    return;
+  }
+  document.getElementById("bars").closest(".card").style.display = "";
   document.getElementById("stat-grid").innerHTML = `
     <div class="stat"><div class="sv">${money(total)}</div><div class="sl">${t(lbl)}</div></div>
     <div class="stat"><div class="sv">${money(avg)}</div><div class="sl">Moyenne / jour</div></div>
@@ -2866,6 +2899,7 @@ function frequentExpenses(){
 function renderQuickChips(){
   const host = document.getElementById("quick-chips");
   const items = frequentExpenses();
+  document.getElementById("chips-field").style.display = items.length ? "block" : "none";   // rien de fréquent : pas de champ vide
   // données passées via dataset (jamais via des strings inline : encodeURIComponent ne couvre pas « ' »)
   host.innerHTML = items.map((x,i)=>
     `<button class="chip" data-i="${i}">${esc(catOf(x.cat).emoji)} ${esc(x.name)} <span class="am">${money(x.amount)}</span></button>`
@@ -3187,7 +3221,7 @@ function renderCoupleCard(){
   document.getElementById("couple-title").textContent = t("Couple") + " · " + my + " & " + p;
   let lines = "";
   if (!total){
-    lines = '<div class="empty" style="padding:10px 0">' + t("Aucune dépense pour le moment.") + "</div>";
+    lines = emptyState("💑", t("Rien ce mois"), t("Les dépenses du couple s'ajouteront ici après une synchro."));
   } else {
     lines =
       `<div class="cmp-row"><span class="cmp-lbl">${esc(my)}</span><span class="cmp-nums">${money(sum.me + sum.shared/2)}</span></div>` +
@@ -3708,7 +3742,13 @@ function applyHistoryFilter(){
   document.getElementById("history-sub").textContent =
     tt("{n} transaction(s) · {t}", {n: items.length, t: money(total)});
   const shown = items.slice(0, histShown);
-  renderList("history-list", shown, false);
+  let emptyMsg;
+  if (!items.length){
+    const c = catOf(f);
+    if (q) emptyMsg = emptyState("🔍", tt("Aucun résultat pour «\u00a0{a}\u00a0»", {a: esc(q)}), t("Vérifie l'orthographe ou essaie un autre mot."));
+    else if (f !== "all") emptyMsg = emptyState(c.emoji, tt("Rien en {a} pour le moment", {a: esc(c.label)}), t("Ajoute une dépense dans cette catégorie — ou vois tout."));
+  }
+  renderList("history-list", shown, false, emptyMsg);
   if (items.length > shown.length){
     const host = document.getElementById("history-list");
     const btn = document.createElement("button");
