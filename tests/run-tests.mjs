@@ -5,7 +5,7 @@
  * par sections (repères stables) et on les évalue avec des stubs injectés.
  * Zéro dépendance. Couvre : parseur de montants, CSV (banque Débit/Crédit,
  * relevés signés), validation stricte des sauvegardes (anti-injection),
- * extraction OCR (montant/date/marchand), récurrences (jamais rétroactives).
+ * récurrences (jamais rétroactives).
  */
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
@@ -29,15 +29,12 @@ const amountFns = new Function(grab("function esc(", "function catOf") + "return
 const csvFns = new Function("DAY", grab("const CAT_HINTS", "let csvRows = null") + "return { parseMoneyCell, normalizeCsvDate, parseCsv, guessCat };")(864e5);
 const CATS = { other:{label:"Autre",emoji:"📦",color:"#8e8e93"}, food:{label:"Alimentation",emoji:"🍔",color:"#ff9500"}, transport:{label:"Transport",emoji:"🚕",color:"#5ac8fa"} };
 const backupFns = new Function("SCHEMA_VERSION", "CATS", grab("/* ====== Restauration : aperçu + fusion dédoublonnée ou remplacement ====== */", "let backupPending") + "return { buildBackup };")(3, CATS);
-const ocr = new Function("state", grab("function parseAmount", "function catOf") +
-  grab("const stripAccents", "function fillOcrCats") + "return { ocrExtract, ocrGuessCat, stripAccents };")(
-  { cats: { food:{label:"Alimentation"}, transport:{label:"Transport"}, bills:{label:"Logement"}, fun:{label:"Loisirs"}, health:{label:"Santé et pharmacie"}, other:{label:"Autre"} } });
+
 const recFns = new Function("ymd", "todayISO", "state", "save", grab("/* ============ Dépenses récurrentes ============ */", "function renderRecurring") + "return { nextOccur, firstOccur, processRecurring };")(ymd, todayISO, { expenses: [], recurring: [] }, () => {});
 
 const { esc, parseAmount } = amountFns;
 const { parseMoneyCell, normalizeCsvDate, parseCsv, guessCat } = csvFns;
 const { buildBackup } = backupFns;
-const { ocrExtract, ocrGuessCat } = ocr;
 const { nextOccur, firstOccur, processRecurring } = recFns;
 
 /* --- Harnais --- */
@@ -122,24 +119,6 @@ check(legit.expenses[0].id === "01234567-89ab-cdef-0123-456789abcdef" && legit.g
 check(legit.rev === 42 && legit.budget === 1000 && legit.budgets.food === 300, "buildBackup : rev/budgets intacts");
 check(legit.recurring[0].lastAdded === "2026-09-05" && legit.recurring[0].cat === "food", "buildBackup : récurrence date/cat conservées");
 
-/* ======== ocrExtract ======== */
-eq(ocrExtract("CARREFOUR MARKET\n2026-10-01\nTOTAL : 12,50 €").amount, 12.5, "OCR montant ligne TOTAL");
-eq(ocrExtract("SOUS-TOTAL 10,00\nTOTAL : 12,50").amount, 12.5, "OCR : TOTAL au-dessus du sous-total");
-eq(ocrExtract("TICKET\n10/10/2026\nTOTAL : 12,50").date, "2026-10-10", "OCR date JJ/MM/AAAA");
-eq(ocrExtract("TICKET\n2026-10-01\nTOTAL : 12,50").date, "2026-10-01", "OCR date ISO");
-eq(ocrExtract("CARREFOUR MARKET\n1234 MAIN ST\nTOTAL 12,50").merchant, "CARREFOUR MARKET", "OCR marchand = 1ʳᵉ ligne");
-eq(ocrExtract("NET A PAYER 45,00 €").amount, 45, "OCR montant NET À PAYER");
-eq(ocrExtract("TOTAL").amount, 0, "OCR sans montant → 0");
-eq(ocrExtract("TVA 1,20\nTOTAL 12,50").amount, 12.5, "OCR : la TVA n'est pas le total");
-check(typeof ocrExtract("TOTAL 2").amount === "number" && typeof ocrExtract("TOTAL 2").date === "string", "OCR : sortie toujours objet date/amount/merchant");
-check(ocrExtract(null).amount === 0 && ocrExtract(null).date === "", "OCR : entrée non-string → valeurs neutres");
-
-/* ======== ocrGuessCat ======== */
-eq(ocrGuessCat("SUPERMARCHE SHOPRITE"), "food", "OCR cat supermarché → food");
-eq(ocrGuessCat("STATION TAXI METRO"), "transport", "OCR cat transport");
-eq(ocrGuessCat("PHARMACIE CENTRALE"), "health", "OCR cat pharmacie → santé");
-check(["food","transport","bills","fun","health","other"].includes(ocrGuessCat("")), "OCR cat fallback = une catégorie existante");
-
 /* ======== Récurrences ======== */
 const today = todayISO();
 check(firstOccur({freq:"m", day:1}) > today, "récurrence mensuelle jour passé → prochaine occurrence");
@@ -163,91 +142,6 @@ eq(nextOccur({freq:"w", wd:0}, "2026-10-05"), "2026-10-12", "nextOccur hebdo +7 
   fns2.processRecurring();
   eq(st2.expenses.length, today.slice(8) < "01" ? 1 : 0, "création en cours de mois avec jour passé : pas d'ajout rétroactif");
 }
-
-/* ======== Budget couple ======== */
-const TODAY = "2026-10-10";
-const ST = {};
-const useST = obj => {
-  Object.keys(ST).forEach(k => delete ST[k]);
-  Object.keys(obj).forEach(k => {
-    const v = obj[k];
-    ST[k] = (Array.isArray(v)) ? v.map(x=>JSON.parse(JSON.stringify(x)))
-         : (v && typeof v === "object") ? JSON.parse(JSON.stringify(v)) : v;
-  });
-  return ST;
-};
-const coupleFns = new Function("SCHEMA_VERSION", "CATS", "state", "todayISO",
-  grab("/* ====== Restauration : aperçu + fusion dédoublonnée ou remplacement ====== */", "let backupPending") +
-  grab("/* ============ Budget couple ============ */", "/* ====== Vue du soir") +
-  "const LANG = \"fr\"; return { couple, remapWho, buildCoupleExport, coupleMergeInto, buildCoupleImport };"
-)(3, { other:{label:"Autre",emoji:"\ud83d\udce6",color:"#8e8e93"}, food:{label:"Alimentation",emoji:"\ud83c\udf54",color:"#ff9500"} }, ST, () => TODAY);
-const { remapWho, buildCoupleExport, coupleMergeInto, buildCoupleImport } = coupleFns;
-
-const emptyCouple = () => ({ on:true, partner:"", sentIds:[], lastAt:"", deviceId:"11111111-1111-4111-8111-111111111111" });
-const stA = () => ({ budget: 100,
-  expenses: [
-    { id:"aaaaaaaa-1111-4111-8111-000000000001", name:"Café", cat:"food", amount:2.5, date:"2026-10-09", who:"me" },
-    { id:"aaaaaaaa-1111-4111-8111-000000000002", name:"Courses", cat:"food", amount:40, date:"2026-10-10", who:"shared" }
-  ],
-  cats: { food:{label:"Alimentation",emoji:"\ud83c\udf54",color:"#ff9500"} }, budgets:{}, goals:[], recurring:[] });
-const stB = () => ({ budget: 0,
-  expenses: [ { id:"bbbbbbbb-2222-4222-8222-000000000001", name:"Taxi", cat:"transport", amount:12, date:"2026-10-09", who:"me" } ],
-  cats:{}, budgets:{}, goals:[], recurring:[] });
-
-// remappage moi⇄toi selon la provenance
-eq(remapWho("me", false), "partner", "remapWho : moi → toi");
-eq(remapWho("partner", false), "me", "remapWho : toi → moi");
-eq(remapWho("shared", false), "shared", "remapWho : à deux inchangé");
-eq(remapWho("me", true), "me", "remapWho : même deviceId → inchangé");
-
-// A exporte son delta, B le fusionne
-{
-  const A = stA(); A.couple = emptyCouple();
-  useST(A);
-  const payload = buildCoupleExport();
-  const bk = buildCoupleImport(JSON.parse(JSON.stringify({ ...payload, from: A.couple.deviceId, name: "Ama" })));
-  check(bk && bk.app === "sika-couple" && bk.expenses.length === 2, "couple : export → import complet");
-  const B = stB(); B.couple = { on:false, partner:"", sentIds:[], lastAt:"", deviceId:"22222222-2222-4222-8222-222222222222" };
-  const r1 = coupleMergeInto(B, bk, false);
-  eq(r1.added, 2, "couple : fusion B reçoit les 2 dépenses de A");
-  eq(B.expenses.find(e=>e.name==="Courses").who, "shared", "couple : à deux inchangé chez B");
-  check(B.couple.on && B.couple.partner === "Ama", "couple : activation + prénom adoptés");
-  check(B.couple.sentIds.includes("aaaaaaaa-1111-4111-8111-000000000001"), "couple : ids reçus marqués envoyés");
-  // B répond : son delta n'inclut PAS les dépenses reçues (déjà connues de A)
-  useST(B);
-  const payloadB = buildCoupleExport();
-  eq(payloadB.expenses.map(e=>e.name), ["Taxi"], "couple : la réponse de B ne renvoie pas les dépenses de A");
-  const bkB = buildCoupleImport({ app:"sika-couple", expenses: payloadB.expenses, cats: payloadB.cats, budgets: payloadB.budgets,
-    budget: payloadB.budget, goals: payloadB.goals, recurring: payloadB.recurring, from: B.couple.deviceId, name: "Koami" });
-  const r2 = coupleMergeInto(A, bkB, false);
-  eq(r2.added, 1, "couple : fusion A reçoit le delta de B");
-  eq(A.expenses.find(e=>e.name==="Taxi").who, "partner", "couple : taxi de B = partner chez A");
-  // idempotence : refusion du même fichier → 0 ajouté
-  const r3 = coupleMergeInto(A, bkB, false);
-  eq(r3.added, 0, "couple : refusion = 0 ajout (dédup id + date|nom|montant)");
-  // second appareil de la même personne : pas de swap
-  const A2 = stB(); A2.couple = { on:true, partner:"", sentIds:[], lastAt:"", deviceId:"11111111-1111-4111-8111-111111111111" };
-  coupleMergeInto(A2, bkB, true);
-  eq(A2.expenses[0].who, "me", "couple : même deviceId → attribution inchangée");
-  // fichier malveillant sur le couple
-  const evil = buildCoupleImport({ app:"sika-couple", from:"11111111-1111-4111-8111-111111111111", name:"<x>",
-    expenses:[{ id:"x'); alert(1); ('", name:"<b>", cat:"food", amount:1, date:"2026-10-01", who:"me" }] });
-  check(evil && UUIDRE.test(evil.expenses[0].id), "couple : id malveillant reconstruit dans le canal couple");
-  check(buildCoupleImport({ app:"autre", expenses:[] }) === null, "couple : app inconnue rejetée");
-  check(buildCoupleImport({ app:"sika-couple", expenses:"pas-un-tableau" }) === null, "couple : expenses non-tableau rejeté");
-}
-
-/* ======== timestamp + ordre intra-jour ======== */
-const stTs = useST({ budget:0, expenses:[
-  { id:"bbbbbbbb-0000-4000-8000-000000000002", name:"Deuxieme", cat:"food", amount:2, date:"2026-10-10", who:"me" },
-  { id:"bbbbbbbb-0000-4000-8000-000000000001", name:"Premier",  cat:"food", amount:1, date:"2026-10-10", who:"me", ts:1700000000000 }
-], couple: emptyCouple() });
-const expTs = buildCoupleExport();
-check(expTs.expenses[0].ts === 0 && expTs.expenses[1].ts === 1700000000000, "couple : ts exporté tel quel (absent → 0)");
-const bakTs = buildBackup({ expenses: expTs.expenses, cats: { food: { label:"Food", emoji:"\ud83c\udf54", color:"#ff9500" } } });
-eq(bakTs.expenses.map(e=>e.ts), [0, 1700000000000], "buildBackup : ts validé (borne 1e12–9e15) et conservé");
-const badTs = buildBackup({ expenses: [{ id:"aaaaaaaa-1111-4111-8111-000000000001", name:"x", cat:"food", amount:1, date:"2026-10-10", ts:"'; drop table" }] });
-eq(badTs.expenses[0].ts, 0, "buildBackup : ts non numérique → 0");
 
 /* ======== esc ======== */
 eq(esc("<img src=x onerror=alert(1)>"), "&lt;img src=x onerror=alert(1)&gt;", "esc : balise");

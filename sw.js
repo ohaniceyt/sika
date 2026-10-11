@@ -1,9 +1,9 @@
 /* Sika — service worker (network-first pour l'app shell, offline-first pour le reste) */
-const CACHE = "sika-v23";
+const CACHE = "sika-v24";
 // Les splash screens iOS (icons/splash/) ne sont PAS pré-cachés : ~150 Ko à l'install
 // pour un usage qui n'est pas hors-ligne critique. Ils entrent au cache runtime
 // (offline-first) dès la première consultation en ligne.
-const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon-180.png", "./icons/icon.svg", "./vendor/qr/qrcode.min.js", "./vendor/qr/jsQR.min.js"];
+const CORE = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon-180.png", "./icons/icon.svg"];
 
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
