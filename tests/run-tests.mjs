@@ -237,6 +237,18 @@ eq(remapWho("me", true), "me", "remapWho : même deviceId → inchangé");
   check(buildCoupleImport({ app:"sika-couple", expenses:"pas-un-tableau" }) === null, "couple : expenses non-tableau rejeté");
 }
 
+/* ======== timestamp + ordre intra-jour ======== */
+const stTs = useST({ budget:0, expenses:[
+  { id:"bbbbbbbb-0000-4000-8000-000000000002", name:"Deuxieme", cat:"food", amount:2, date:"2026-10-10", who:"me" },
+  { id:"bbbbbbbb-0000-4000-8000-000000000001", name:"Premier",  cat:"food", amount:1, date:"2026-10-10", who:"me", ts:1700000000000 }
+], couple: emptyCouple() });
+const expTs = buildCoupleExport();
+check(expTs.expenses[0].ts === 0 && expTs.expenses[1].ts === 1700000000000, "couple : ts exporté tel quel (absent → 0)");
+const bakTs = buildBackup({ expenses: expTs.expenses, cats: { food: { label:"Food", emoji:"\ud83c\udf54", color:"#ff9500" } } });
+eq(bakTs.expenses.map(e=>e.ts), [0, 1700000000000], "buildBackup : ts validé (borne 1e12–9e15) et conservé");
+const badTs = buildBackup({ expenses: [{ id:"aaaaaaaa-1111-4111-8111-000000000001", name:"x", cat:"food", amount:1, date:"2026-10-10", ts:"'; drop table" }] });
+eq(badTs.expenses[0].ts, 0, "buildBackup : ts non numérique → 0");
+
 /* ======== esc ======== */
 eq(esc("<img src=x onerror=alert(1)>"), "&lt;img src=x onerror=alert(1)&gt;", "esc : balise");
 eq(esc('"a\'&'), "&quot;a&#39;&amp;", "esc : guillemets + &");

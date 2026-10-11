@@ -1375,7 +1375,7 @@ function processRecurring(){
     let occ = base && base <= today ? nextOccur(r, base) : firstOccur(r);
     let guard = 0;
     while (occ <= today && guard < 1200){   // garde-fou (reprise > 20 ans impossible en pratique)
-      state.expenses.push({ id:crypto.randomUUID(), name:r.name, cat:r.cat, amount:+r.amount, date:occ });
+      state.expenses.push({ id:crypto.randomUUID(), name:r.name, cat:r.cat, amount:+r.amount, date:occ, ts:Date.now() });
       r.lastAdded = occ;
       changed = true;
       occ = nextOccur(r, occ);
@@ -1554,7 +1554,7 @@ function confirmCsvImport(){
   const have = new Set(state.expenses.map(e=>e.date + "|" + e.name + "|" + Math.round(+e.amount*100)));   // Set : O(1) par ligne (20k+ dépenses = O(n) au total)
   csvRows.forEach(r=>{
     if (have.has(r.date + "|" + r.label + "|" + Math.round(+r.amount*100))) return;   // pas de doublon exact (même date, même libellé, même montant)
-    state.expenses.push({ id:crypto.randomUUID(), name:r.label, cat: r.cat in state.cats ? r.cat : "other", amount:r.amount, date:r.date });
+    state.expenses.push({ id:crypto.randomUUID(), name:r.label, cat: r.cat in state.cats ? r.cat : "other", amount:r.amount, date:r.date, ts:Date.now() });
     have.add(r.date + "|" + r.label + "|" + Math.round(+r.amount*100));
     added++;
   });
@@ -2227,7 +2227,7 @@ function renderList(elId, items, compact){
       const tot = day.reduce((s,e)=>s+e.amount,0);
       html += `<div class="list-header"><span class="t" style="font-size:15px;color:var(--secondary-label);text-transform:capitalize">${dayName(d)}</span><span style="font-size:13px;color:var(--secondary-label);font-weight:600">${money(tot)}</span></div>`;
       html += `<div class="group">`;
-      day.sort((a,b)=>b.id.localeCompare(a.id)).forEach(e=>{
+      day.sort((a,b)=> (b.ts||0)-(a.ts||0) || b.id.localeCompare(a.id)).forEach(e=>{
         const c=catOf(e.cat);
         html += `<div class="rowitem" data-id="${e.id}" role="button" tabindex="0" aria-label="${esc(tt("Dépense : {a}, {b}", {a: e.name, b: money(e.amount)}))}">
           <div class="icon-badge" style="background:${c.color}22">${esc(c.emoji)}</div>
@@ -2326,7 +2326,7 @@ function saveExpense(){
   const n = document.getElementById("in-name").value.trim();
   if (!a || a<=0){ toast("Entre un montant valide"); return; }
   state.expenses.push({ id: crypto.randomUUID(), name: n || catOf(pickedCat).label, cat: pickedCat,
-    amount: a, date: todayISO(),
+    amount: a, date: todayISO(), ts: Date.now(),
     ...(couple().on ? { who: pickedWho } : {}) });
   save(); closeSheet(); render();
   toast("✓ Dépense ajoutée");
@@ -2382,7 +2382,7 @@ function duplicateFromEdit(){
   const a = parseAmount(document.getElementById("edit-amount").value) || +e.amount;
   const cat = document.getElementById("edit-cat").value;
   const name = document.getElementById("edit-name").value.trim() || catOf(cat).label;
-  state.expenses.push({ id:crypto.randomUUID(), name, cat, amount:a, date:todayISO() });
+  state.expenses.push({ id:crypto.randomUUID(), name, cat, amount:a, date:todayISO(), ts:Date.now() });
   save(); clearSheetOverlay(); closeEditSheet(); render();
   toast("＋ Dupliquée pour aujourd'hui");
 }
@@ -3013,7 +3013,7 @@ function buildBackup(s){
       sentIds: Array.isArray(s.couple.sentIds) ? s.couple.sentIds.filter(x=>SAFE_UUID.test(x)).slice(0,2000) : [],
       lastAt: SAFE_DATE.test(s.couple.lastAt || "") ? s.couple.lastAt : ""
     } : null,
-    expenses: s.expenses.filter(e=>e && e.amount>0 && SAFE_DATE.test(e.date)).map(e=>({ id:safeId(e.id), name:String(e.name||"").slice(0,60), cat: knownCat(e.cat) || "other", amount:+e.amount, date:e.date, who: (e.who==="partner" || e.who==="shared") ? e.who : "me"}))
+    expenses: s.expenses.filter(e=>e && e.amount>0 && SAFE_DATE.test(e.date)).map(e=>({ id:safeId(e.id), name:String(e.name||"").slice(0,60), cat: knownCat(e.cat) || "other", amount:+e.amount, date:e.date, who: (e.who==="partner" || e.who==="shared") ? e.who : "me", ts: (+e.ts && +e.ts > 1e12 && +e.ts < 9e15) ? +e.ts : 0}))
   };
 }
 let backupPending = null;
@@ -3101,7 +3101,7 @@ function buildCoupleExport(st){
   const sent = new Set(c.sentIds || []);
   const expenses = st.expenses.filter(e=>!sent.has(e.id)).map(e=>({
     id:e.id, name:String(e.name||"").slice(0,60), cat:e.cat, amount:+e.amount,
-    date:e.date, who:(e.who==="partner"||e.who==="shared") ? e.who : "me"
+    date:e.date, who:(e.who==="partner"||e.who==="shared") ? e.who : "me", ts:+e.ts || 0
   }));
   return { app:"sika-couple", schema:SCHEMA_VERSION, exportedAt: todayISO(),
     from: c.deviceId || "",
@@ -3124,7 +3124,7 @@ function coupleMergeInto(st, bk, fromIsMe){
   const sent = new Set((st.couple && st.couple.sentIds) || []);   // ids dont l'autre a déjà connaissance
   let added = 0, skipped = 0;
   bk.expenses.forEach(e=>{
-    const merged = { ...e, who: remapWho(e.who, fromIsMe) };
+    const merged = { ...e, who: remapWho(e.who, fromIsMe), ts: e.ts || Date.now() };
     if (byId.has(e.id) || have.has(key(merged))){ skipped++; sent.add(e.id); return; }
     st.expenses.push(merged); byId.add(e.id); have.add(key(merged)); sent.add(e.id); added++;
   });
@@ -3691,7 +3691,7 @@ let histShown = HIST_PAGE;
 function applyHistoryFilter(){
   const f = document.getElementById("hist-filter").dataset.c || "all";
   const q = (document.getElementById("hist-search").value||"").toLowerCase().trim();
-  const all = [...state.expenses].sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  const all = [...state.expenses].sort((a,b)=> b.date.localeCompare(a.date) || (b.ts||0)-(a.ts||0) || b.id.localeCompare(a.id));
   let items = f==="all" ? all : all.filter(e=>e.cat===f);
   if (q) items = items.filter(e=> e.name.toLowerCase().includes(q) || catOf(e.cat).label.toLowerCase().includes(q));
   const total = items.reduce((s,e)=>s+e.amount,0);
@@ -4287,7 +4287,7 @@ function saveOcrExpense(){
   const n = document.getElementById("ocr-name").value.trim();
   const cat = document.getElementById("ocr-cat").value;
   state.expenses.push({ id: crypto.randomUUID(), name: n || catOf(cat).label, cat,
-    amount: a, date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayISO(),
+    amount: a, date: /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayISO(), ts: Date.now(),
     ...(couple().on ? { who: ocrWho } : {}) });
   save(); closeOcrSheet(); render();
   toast("✓ Dépense ajoutée");
