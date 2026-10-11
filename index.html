@@ -2125,6 +2125,10 @@ function renderEnvelopes(){
       <div class="env-bar"><div style="width:${pct}%;background:${over?"var(--red)":c.color}"></div></div>
     </div>`;
   }).join("");
+  rows.forEach(([k], i)=>{
+    const el = host.children[i].querySelector(".env-v");
+    animateNumber(el, "env:" + k + ":" + state.currency, spendByCat[k]||0, money);
+  });
 }
 
 function postponeBackup(){
@@ -2171,6 +2175,23 @@ function backupReminder(){
       : t("Aucune sauvegarde depuis la création — ton historique mérite un fichier");
   } else card.style.display = "none";
 }
+/* --- Compteurs animés (version douce : uniquement quand la valeur change) --- */
+const __numPrev = new Map();   // clé → dernière valeur affichée (null = jamais affichée)
+function animateNumber(el, key, to, fmt){
+  if (!el) return;
+  const hasPrev = __numPrev.has(key);
+  const from = hasPrev ? __numPrev.get(key) : to;
+  __numPrev.set(key, to);
+  if (from === to || !hasPrev){ el.textContent = fmt(to); return; }
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches){ el.textContent = fmt(to); return; }
+  const t0 = performance.now(), DUR = 700, ease = t => 1 - Math.pow(1-t, 3);
+  const frame = now => {
+    const pt = Math.min((now - t0)/DUR, 1);
+    el.textContent = fmt(from + (to - from)*ease(pt));
+    if (pt < 1) requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
 function renderHome(){
   const month = todayISO().slice(0,7);
   const spent = state.expenses.filter(e=>e.date.startsWith(month)).reduce((s,e)=>s+e.amount,0);
@@ -2181,14 +2202,14 @@ function renderHome(){
     const remaining = bud - spent;
     const pct = Math.min(spent/bud*100,100);
     labelEl.textContent = "Solde mensuel restant";
-    document.getElementById("hero-remaining").textContent = money(Math.max(remaining,0));
+    animateNumber(document.getElementById("hero-remaining"), "hero-rem", Math.max(remaining,0), money);
     document.getElementById("hero-spent").textContent = tt("Dépensé ce mois : {a} · Budget {b}", {a: money(spent), b: money(bud)});
     document.getElementById("hero-bar").firstElementChild.style.width = pct+"%";
     document.getElementById("hero-bar").firstElementChild.style.background = remaining<0 ? "var(--red)" : "#fff";
     barWrap.style.visibility = "visible";
   } else {
     labelEl.textContent = "Dépensé ce mois";
-    document.getElementById("hero-remaining").textContent = money(spent);
+    animateNumber(document.getElementById("hero-remaining"), "hero-sp", spent, money);
     document.getElementById("hero-spent").textContent = "Aucun budget défini — ajoute-le dans Réglages quand tu veux";
     document.getElementById("hero-bar").firstElementChild.style.width = "100%";
     document.getElementById("hero-bar").firstElementChild.style.background = "rgba(255,255,255,.22)";
