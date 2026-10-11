@@ -687,12 +687,6 @@
   </div>
   <div class="list-header"><span class="t">Catégories</span></div>
   <div class="group" id="cat-manage"></div>
-  <div class="group">
-    <div class="setrow" onclick="openCatSheet()" role="button" tabindex="0" style="cursor:pointer">
-      <div class="icon-badge" style="background:rgba(0,122,255,.15)">➕</div>
-      <div class="n" style="color:var(--blue);font-weight:600">Ajouter une catégorie</div>
-    </div>
-  </div>
   <div class="list-header"><span class="t">Budget couple</span></div>
   <div class="sub" style="padding:0 20px 6px;font-size:12px;color:var(--secondary-label)">Deux téléphones, un budget — chaque téléphone exporte son fichier d'échange, l'autre l'importe. 100% local.</div>
   <div class="group">
@@ -728,32 +722,17 @@
   </div>
   <div class="list-header"><span class="t">Données</span></div>
   <div class="group">
-    <div class="setrow" onclick="resetAll()" role="button" tabindex="0" style="cursor:pointer">
-      <div class="icon-badge" style="background:rgba(255,59,48,.14)">🗑️</div>
-      <div class="n" style="color:var(--red);font-weight:600">Effacer toutes les données</div>
+    <div class="setrow" onclick="openExportSheet()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(52,199,89,.14)">💾</div>
+      <div class="n">Sauvegarder &amp; exporter</div>
+      <div class="v chev">▾</div>
     </div>
-    <div class="setrow" onclick="exportCSV()" role="button" tabindex="0" style="cursor:pointer">
-      <div class="icon-badge" style="background:rgba(52,199,89,.14)">📤</div>
-      <div class="n">Exporter en CSV</div>
-      <div class="v">.csv</div>
-    </div>
-    <div class="setrow" onclick="exportBackup()" role="button" tabindex="0" style="cursor:pointer">
-      <div class="icon-badge" style="background:rgba(0,122,255,.14)">💾</div>
-      <div class="n">Sauvegarde complète (JSON)</div>
-      <div class="v">tout</div>
-    </div>
-    <div class="setrow" onclick="document.getElementById('csv-file').click()" role="button" tabindex="0" style="cursor:pointer">
-      <div class="icon-badge" style="background:rgba(255,149,0,.16)">📎</div>
-      <div class="n">Importer un relevé CSV</div>
-      <div class="v">.csv</div>
-    </div>
-    <input type="file" id="csv-file" accept=".csv,text/csv" style="display:none">
-    <div class="setrow" onclick="document.getElementById('import-file').click()" role="button" tabindex="0" style="cursor:pointer">
+    <div class="setrow" onclick="document.getElementById('data-file').click()" role="button" tabindex="0" style="cursor:pointer">
       <div class="icon-badge" style="background:rgba(88,86,214,.14)">📥</div>
-      <div class="n">Restaurer une sauvegarde</div>
-      <div class="v">.json</div>
+      <div class="n">Importer un fichier</div>
+      <div class="v">.json .csv</div>
     </div>
-    <input type="file" id="import-file" accept=".json,application/json" style="display:none">
+    <input type="file" id="data-file" accept=".json,.csv,application/json,text/csv" style="display:none">
     <div class="setrow" onclick="openDeviceSheet()" role="button" tabindex="0" style="cursor:pointer">
       <div class="icon-badge" style="background:rgba(90,200,250,.15)">📱</div>
       <div class="n">Passer sur un autre appareil</div>
@@ -768,6 +747,10 @@
       <div class="icon-badge" style="background:rgba(175,82,222,.15)">🔄</div>
       <div class="n">Revoir la présentation</div>
       <div class="v">onboarding</div>
+    </div>
+    <div class="setrow" onclick="resetAll()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(255,59,48,.14)">🗑️</div>
+      <div class="n" style="color:var(--red);font-weight:600">Effacer toutes les données</div>
     </div>
   </div>
   <div class="group" style="margin-top:20px">
@@ -1151,7 +1134,7 @@
   <div class="group">
     <div class="setrow"><div class="icon-badge" style="background:rgba(0,122,255,.15)">1</div><div class="n">Ici : Réglages → Sauvegarde complète (JSON)</div></div>
     <div class="setrow"><div class="icon-badge" style="background:rgba(52,199,89,.15)">2</div><div class="n">Envoie le fichier par Mail, AirDrop ou WhatsApp</div></div>
-    <div class="setrow"><div class="icon-badge" style="background:rgba(255,149,0,.15)">3</div><div class="n">Sur le nouvel appareil : Restaurer une sauvegarde → choisis fusionner</div></div>
+    <div class="setrow"><div class="icon-badge" style="background:rgba(255,149,0,.15)">3</div><div class="n">Sur le nouvel appareil : Importer un fichier → choisis fusionner</div></div>
   </div>
   <button class="btn-ghost" onclick="closeDeviceSheet()" style="color:var(--secondary-label)">OK</button>
 </div>
@@ -1181,6 +1164,24 @@
     <button class="btn-primary" id="pair-use-paste" style="display:none" onclick="pairUsePaste()">Continuer avec ce code</button>
     <button class="btn-ghost" onclick="pairClose()" style="color:var(--secondary-label)">Fermer</button>
   </div>
+</div>
+
+<div class="sheet" id="export-sheet" role="dialog" aria-modal="true">
+  <div class="grabber"></div>
+  <h2>Exporter</h2>
+  <div class="group">
+    <div class="setrow" onclick="closeExportSheet(); exportBackup()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(0,122,255,.15)">💾</div>
+      <div class="n">Sauvegarde complète (JSON)</div>
+      <div class="v">tout</div>
+    </div>
+    <div class="setrow" onclick="closeExportSheet(); exportCSV()" role="button" tabindex="0" style="cursor:pointer">
+      <div class="icon-badge" style="background:rgba(255,149,0,.16)">📤</div>
+      <div class="n">Exporter en CSV</div>
+      <div class="v">.csv</div>
+    </div>
+  </div>
+  <button class="btn-ghost" onclick="closeExportSheet()" style="color:var(--secondary-label)">Annuler</button>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -1825,6 +1826,10 @@ const I18N_EN = {
   "Connexion perdue — réessaie ou utilise le fichier 📤":"Connection lost — retry or use the file 📤",
   "✓ Synchro faite — à jour":"✓ Sync done — up to date",
   "Historique trop gros 📤 — utilise le fichier d'échange":"History too big 📤 — use the exchange file",
+  "Sauvegarder & exporter":"Save & export",
+  "Importer un fichier":"Import a file",
+  "Exporter":"Export",
+  "Fichier d'échange couple : importe-le dans « Budget couple »":"Couple exchange file: import it under « Couple budget »",
   "Moyenne":"Average",
   "Total":"Total",
   "Transactions":"Transactions",
@@ -2385,7 +2390,7 @@ function clearSheetOverlay(){
   document.getElementById("overlay").classList.remove("show"); syncScrollLock();
 }
 function closeAllSheets(){
-  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet(); closeLangSheet(); closeBackupSheet(); closeDeviceSheet(); closeEveningSheet(); closeOcrSheet(); closeCoupleSheet(); pairClose();
+  closeSheet(); closeCatSheet(); closeRecSheet(); closeGoalSheets(); closeEditSheet(); closeEditCatSheet(); closeDelCatSheet(); closeLangSheet(); closeBackupSheet(); closeDeviceSheet(); closeEveningSheet(); closeOcrSheet(); closeCoupleSheet(); pairClose(); closeExportSheet();
   closeOpenSwipe();
   clearSheetOverlay();
 }
@@ -2427,6 +2432,12 @@ function renderCats(){
     wrap.appendChild(front);
     host.appendChild(wrap);
   });
+  const add = document.createElement("div"); add.className = "setrow";
+  add.setAttribute("role","button"); add.tabIndex = 0;
+  add.innerHTML = `<div class="icon-badge" style="background:rgba(0,122,255,.15)">➕</div>
+    <div class="n" style="color:var(--blue);font-weight:600">${t("Ajouter une catégorie")}</div>`;
+  add.onclick = openCatSheet;
+  host.appendChild(add);
 }
 let openSwipe = null;
 function closeOpenSwipe(){
@@ -3006,19 +3017,30 @@ function buildBackup(s){
   };
 }
 let backupPending = null;
-function importBackup(file){
+/* Importeur unique : JSON (sauvegarde ou fichier d'échange couple) vs CSV bancaire */
+function importBackupText(txt){
+  try {
+    const data = JSON.parse(txt);
+    if (data && data.app === "sika-couple"){
+      const ck = buildCoupleImport(data);
+      if (ck){ openCoupleSheet(ck); return; }   // fichier couple déposé au mauvais endroit : on route
+    }
+    if (!data || (typeof data !== "object")) throw new Error("format");
+    const bk = buildBackup((data && data.state) ? data.state : data);
+    bk.exportedAt = data && data.exportedAt ? String(data.exportedAt).slice(0,10) : "";
+    openBackupSheet(bk);
+  } catch (err) {
+    toast("Import impossible : fichier invalide");
+    console.warn("Sika import:", err);
+  }
+}
+function importDataFile(file){
   if (!file) return;
   const fr = new FileReader();
   fr.onload = () => {
-    try {
-      const data = JSON.parse(fr.result);
-      const bk = buildBackup((data && data.state) ? data.state : data);
-      bk.exportedAt = data && data.exportedAt ? String(data.exportedAt).slice(0,10) : "";
-      openBackupSheet(bk);
-    } catch (err) {
-      toast("Import impossible : fichier invalide");
-      console.warn("Sika import:", err);
-    }
+    const txt = String(fr.result || "").trim();
+    if (/^[[{]/.test(txt)) return importBackupText(txt);   // JSON : sauvegarde ou fichier couple
+    openCsvSheet(parseCsv(txt));                            // sinon : relevé bancaire CSV
   };
   fr.readAsText(file);
 }
@@ -3192,6 +3214,14 @@ async function exportCouple(){
   c.sentIds = [...sent];
   c.lastAt = todayISO();
   save(); render();
+}
+function openExportSheet(){
+  document.getElementById("overlay").classList.add("show"); syncScrollLock();
+  document.getElementById("export-sheet").classList.add("show"); syncScrollLock();
+}
+function closeExportSheet(){
+  document.getElementById("export-sheet").classList.remove("show");
+  clearSheetOverlay();
 }
 function couplePick(){ document.getElementById("couple-file").click(); }
 function importCoupleFile(file){
@@ -3864,23 +3894,17 @@ document.getElementById("budget-input").addEventListener("change", e=>{
 document.getElementById("currency-select").addEventListener("change", e=>{
   state.currency=e.target.value; save(); toast(tt("Devise : {a}", {a: state.currency}));
 });
-document.getElementById("import-file").addEventListener("change", e=>{
+document.getElementById("data-file").addEventListener("change", e=>{
   const f = e.target.files && e.target.files[0];
   e.target.value = "";
-  importBackup(f);
+  importDataFile(f);
 });
 document.getElementById("rec-freq").addEventListener("click", e=>{
   const b=e.target.closest("button"); if(!b) return;
   setRecFreq(b.dataset.f);
 });
-document.getElementById("csv-file").addEventListener("change", e=>{
-  const f = e.target.files && e.target.files[0];
-  e.target.value = "";
-  if (!f) return;
-  const fr = new FileReader();
-  fr.onload = () => openCsvSheet(parseCsv(fr.result));
-  fr.readAsText(f);
-});
+
+
 /* --- Budget couple --- */
 document.getElementById("couple-on").addEventListener("change", e=>{
   couple();
@@ -3980,6 +4004,7 @@ enableSwipeClose(document.getElementById("evening-sheet"), closeEveningSheet);
 enableSwipeClose(document.getElementById("edit-cat-sheet"), closeEditCatSheet);
 enableSwipeClose(document.getElementById("couple-sheet"), closeCoupleSheet);
 enableSwipeClose(document.getElementById("pair-sheet"), pairClose);
+enableSwipeClose(document.getElementById("export-sheet"), closeExportSheet);
 document.getElementById("cat-edit-name").addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); saveEditCat(); } });
 
 // ---- Pavé numérique (écrans tactiles) ----
